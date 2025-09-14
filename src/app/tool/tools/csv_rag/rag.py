@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
 
+from src.base.vector_store import VectorStoreBase
+from src.base.base_tool import BaseTool
 from src.enum.embedding_status import embeddingStatus
 from src.config import db
 from .models import CSVRow
@@ -22,10 +24,18 @@ logger.info("Ingest started")
 logger.error("Something failed", exc_info=True)
 
 
-class CsvRagTool:
-    def __init__(self, db: db, vector_store):
+class CsvRagTool(BaseTool):
+    def __init__(self, db: db, vector_store: VectorStoreBase):
         self.db = db
         self.vs = vector_store
+
+    @property
+    def name(self) -> str:
+        return "csv_rag"
+
+    @property
+    def description(self) -> str:
+        return "Searches ingested CSV data via embeddings and vector similarity."
 
     async def ingest(
         self,

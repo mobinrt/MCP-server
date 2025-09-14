@@ -1,27 +1,33 @@
-from typing import List, Dict
+# src/crud.py
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Dict, Any
+from .models import csv_rows
 
-from .models import CSVRow
 
-
-async def bulk_upsert_rows(session: AsyncSession, rows: List[Dict]) -> List[int]:
+async def bulk_upsert_rows(
+    session: AsyncSession, rows: List[Dict[str, Any]]
+) -> Dict[str, int]:
     """
-    Inserts rows and returns mapping checksum -> id (string).
-    Uses ON CONFLICT DO UPDATE SET checksum=EXCLUDED.checksum so RETURNING returns id
-    for both inserted and existing rows.
+    Insert or update rows into csv_rows table.
+    Returns mapping {checksum -> id} for both inserted and existing rows.
+    Uses ON CONFLICT DO UPDATE trick so RETURNING works for existing rows too.
     """
+
     if not rows:
-        return []
+        return {}
 
-    stmt = insert(CSVRow).values(rows)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[CSVRow.c.checksum],
-        set_={"checksum": stmt.excluded.checksum},
-    ).returning(CSVRow.c.id, CSVRow.c.checksum)
+    stmt = (
+        insert(csv_rows)
+        .values(rows)
+        .on_conflict_do_update(
+            index_elements=[csv_rows.c.checksum],
+            set_={"checksum": insert(csv_rows).excluded.checksum}, 
+        )
+        .returning(csv_rows.c.id, csv_rows.c.checksum)
+    )
 
     res = await session.execute(stmt)
     await session.commit()
 
-    chk_to_id = {chk: row_id for row_id, chk in res.fetchall()}
-    return [chk_to_id[r["checksum"]] for r in rows if r["checksum"] in chk_to_id]
+    return {chk: id_ for id_, chk in res.fetchall()}
