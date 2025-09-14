@@ -14,6 +14,14 @@ from src.app.tool.tools.csv_rag.chromadb import vs_add_and_persist_async
 from src.helpers.row_checksum import row_checksum
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.info("Ingest started")
+logger.error("Something failed", exc_info=True)
+
+
 class CsvRagTool:
     def __init__(self, db: db, vector_store):
         self.db = db
@@ -99,7 +107,10 @@ class CsvRagTool:
             await session.execute(
                 update(CSVRow)
                 .where(CSVRow.c.checksum.in_(unique_checksums))
-                .values(embedding_status=embeddingStatus.FAILED.value, embedding_error=str(e))
+                .values(
+                    embedding_status=embeddingStatus.FAILED.value,
+                    embedding_error=str(e),
+                )
             )
             await session.commit()
             return
@@ -127,7 +138,9 @@ class CsvRagTool:
                 await session.execute(
                     update(CSVRow)
                     .where(CSVRow.c.id == meta["row_id"])
-                    .values(embedding_status=embeddingStatus.DONE.value, vector_id=vec_id)
+                    .values(
+                        embedding_status=embeddingStatus.DONE.value, vector_id=vec_id
+                    )
                 )
             await session.commit()
 
@@ -135,7 +148,7 @@ class CsvRagTool:
         """
         Return rows from Postgres joined with similarity scores.
         """
-        emb = (await embed_texts_async([query], batch_size=None)[0])
+        emb = await embed_texts_async([query], batch_size=None)[0]
         res = self.vs.query(emb, top_k=top_k)
 
         ids = [r for r in res["ids"][0]] if "ids" in res else res["ids"]
