@@ -1,3 +1,4 @@
+import asyncio
 from chromadb import Client
 from chromadb.config import Settings as ChromaSettings
 from src.base.vector_store import VectorStoreBase
@@ -37,3 +38,11 @@ class ChromaVectorStore(VectorStoreBase):
 
     def delete(self, ids: List[str]):
         self.collection.delete(ids=ids)
+
+
+async def vs_add_and_persist_async(vs, ids, embeddings, metadatas):
+    def _add_and_persist():
+        vs.add(ids=ids, embeddings=embeddings, metadatas=metadatas)
+        vs.persist()
+
+    await asyncio.to_thread(_add_and_persist)

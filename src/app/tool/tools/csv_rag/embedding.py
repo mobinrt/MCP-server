@@ -1,8 +1,8 @@
 import numpy as np
 from typing import List, Union
-
+import asyncio
 from sentence_transformers import SentenceTransformer
-from typing import List
+
 from src.config.settings import settings
 
 _model = None
@@ -34,3 +34,7 @@ def embed_texts(
 
     embs = np.vstack(all_embs)
     return embs if as_numpy else embs.tolist()
+
+
+async def embed_texts_async(texts, batch_size=None):
+    return await asyncio.to_thread(embed_texts, texts, batch_size)
