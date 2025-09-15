@@ -1,11 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
+
 class BaseTool(ABC):
     """
     Abstract base class for all tools.
     Every tool must implement `name`, `description`, and `run`.
     """
+
+    def __init__(self, config: Dict[str, Any] | None = None):
+        self.config = config or {}
+        self._ready = False
 
     @property
     @abstractmethod
@@ -20,16 +25,16 @@ class BaseTool(ABC):
         pass
 
     @abstractmethod
-    async def run(self, query: str, **kwargs: Dict[str, Any]) -> Any:
-        """
-        Execute the tool with a query (from the user or LLM).
-        Must be async to support API calls / DB queries.
-
-        Args:
-            query: The user input or processed LLM instruction.
-            kwargs: Extra parameters (e.g., config, session, context).
-        
-        Returns:
-            Any result (string, dict, etc.)
-        """
+    async def run(self, payload: Dict[str, Any]) -> Any:
         pass
+
+    async def initialize(self) -> None:
+        """
+        Optional startup hook. Called by the server before serving requests.
+        Should set self._ready = True on success.
+        """
+        self._ready = True
+
+    async def shutdown(self) -> None:
+        """Optional cleanup hook."""
+        return
