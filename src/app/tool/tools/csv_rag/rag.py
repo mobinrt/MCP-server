@@ -158,7 +158,8 @@ class CsvRagTool(BaseTool):
         """
         Return rows from Postgres joined with similarity scores.
         """
-        emb = await embed_texts_async([query], batch_size=None)[0]
+        embs = await embed_texts_async([query], batch_size=None)
+        emb = embs[0]
         res = self.vs.query(emb, top_k=top_k)
 
         ids = [r for r in res["ids"][0]] if "ids" in res else res["ids"]
