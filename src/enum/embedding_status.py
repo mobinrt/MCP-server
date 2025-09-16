@@ -1,6 +1,6 @@
 from enum import Enum 
 
-class embeddingStatus(Enum):
+class EmbeddingStatus(Enum):
     PENDING = "p"
     DONE = "d"
     FAILED = "f"

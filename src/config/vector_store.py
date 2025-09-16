@@ -1,11 +1,13 @@
 import os
-import logging
+
+from src.config.logger import logging
 from src.app.tool.tools.csv_rag.chromadb import ChromaVectorStore
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 os.environ["CHROMA_TELEMETRY_ENABLED"] = settings.chroma_telemetry_enabled
+
 
 class VectorStore:
     def __init__(self):
@@ -16,13 +18,12 @@ class VectorStore:
             persist_dir = settings.chroma_persist_directory
             collection = settings.chroma_collection_name
             telemetry_enabled = settings.chroma_telemetry_enabled
-            
+
             os.makedirs(persist_dir, exist_ok=True)
             logger.info(
                 "Initializing ChromaVectorStore at %s (collection=%s)",
                 persist_dir,
                 collection,
-                telemetry_enabled
             )
 
             self._vs = ChromaVectorStore(collection_name=collection)

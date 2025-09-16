@@ -1,5 +1,4 @@
 import os
-import logging
 import json
 import aiohttp
 from typing import Dict, Any
@@ -7,6 +6,7 @@ from dotenv import load_dotenv
 from rapidfuzz import process, fuzz
 from pathlib import Path
 
+from src.config.logger import logging
 from src.base.base_tool import BaseTool
 from .schema import parse_weather
 from . import CITY_JSON

@@ -1,11 +1,12 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
 from src.config.settings import settings
+from src.helpers.singleton import SingletonMeta
 
 Base = declarative_base()
 
 
-class Database:
+class Database(metaclass=SingletonMeta):
     def __init__(self):
         self.engine = create_async_engine(settings.database_url, echo=True, future=True)
         self.SessionLocal = async_sessionmaker(
@@ -22,5 +23,3 @@ class Database:
         async with self.SessionLocal() as session:
             yield session
 
-
-db = Database()

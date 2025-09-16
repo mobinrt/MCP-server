@@ -24,6 +24,7 @@ async def bulk_upsert_rows(
             index_elements=[CSVRow.checksum],
             set_={
                 "external_id": insert(CSVRow).excluded.external_id,
+                "file_id": insert(CSVRow).excluded.file_id,
                 "content": insert(CSVRow).excluded.content,
                 "fields": insert(CSVRow).excluded.fields,
                 "extra": insert(CSVRow).excluded.extra,

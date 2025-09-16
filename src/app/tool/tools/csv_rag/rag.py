@@ -1,5 +1,5 @@
 # src/app/tool/tools/csv_rag/rag.py
-import logging
+from src.config.logger import logging
 from src.base.base_tool import BaseTool
 from src.helpers.pg_lock import advisory_lock
 
@@ -7,12 +7,15 @@ from src.app.tool.tools.csv_rag.managers.file_manager import CSVFileManager
 from src.app.tool.tools.csv_rag.managers.ingest_manager import CSVIngestManager
 from src.app.tool.tools.csv_rag.managers.query_manager import CSVQueryManager
 from src.app.tool.tools.csv_rag.loader import CSVLoader
+from src.config.db import Database
+from src.base.vector_store import VectorStoreBase
+from src.enum.embedding_status import EmbeddingStatus
 
 logger = logging.getLogger(__name__)
 
 
 class CsvRagTool(BaseTool):
-    def __init__(self, db, vector_store):
+    def __init__(self, db: Database, vector_store: VectorStoreBase):
         self.db = db
         self.vs = vector_store
         self.file_mgr = CSVFileManager(db)
@@ -36,7 +39,9 @@ class CsvRagTool(BaseTool):
         """
         lock_key = 42
         async with self.db.SessionLocal() as session:
-            async with advisory_lock(session, lock_key, wait=False, retries=5, delay=0.1) as acquired:
+            async with advisory_lock(
+                session, lock_key, wait=False, retries=5, delay=0.1
+            ) as acquired:
                 if not acquired:
                     logger.info(
                         "CsvRagTool initialize: another process holds the lock; proceeding (ready)."
@@ -65,11 +70,13 @@ class CsvRagTool(BaseTool):
                 file_paths = await self.file_mgr.scan_folder(folder_path)
                 for p in file_paths:
                     file_meta = await self.file_mgr.get_or_register_file(session, p)
-                    if file_meta.get("_needs_reingest", False):
+                    if file_meta.get("status") == EmbeddingStatus.PENDING.value:
                         logger.info("Ingesting file: %s", p)
 
                         await self.ingest_mgr.ingest_rows(
-                            CSVLoader.stream_csv_async(p), batch_size=batch_size
+                            CSVLoader.stream_csv_async(p),
+                            batch_size=batch_size,
+                            file_meta=file_meta,
                         )
                     else:
                         logger.info("Skipping unchanged file: %s", p)

@@ -1,28 +1,23 @@
 import asyncio
-import logging
-import sys
-import os
 
-# # Ensure src is in sys.path
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+from src.config import db
 from src.app.tool.tools.csv_rag.rag import CsvRagTool
-from src.config.db import db
 from src.config.vector_store import VectorStore
+from src.config.logger import logging
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 async def main():
     # --- 1. Setup DB + Vector store (adapt these imports to your repo config)
     vs = VectorStore().get()
-
+    await db.init_db()
     # --- 2. Init CsvRagTool
     tool = CsvRagTool(db, vs)
     await tool.initialize()
 
     # --- 3. Ingest folder
-    folder = "static/csv"   # <- change to where your test CSVs are
+    folder = "static/csv"  # <- change to where your test CSVs are
     logging.info("Ingesting folder: %s", folder)
     await tool.ingest_folder(folder_path=folder, batch_size=128)
 

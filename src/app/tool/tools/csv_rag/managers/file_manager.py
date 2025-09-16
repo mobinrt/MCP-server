@@ -1,11 +1,14 @@
 import os
 import hashlib
 import asyncio
-import logging
+
 from typing import List, Dict
 
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import Database
+from src.config.logger import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.enum.embedding_status import EmbeddingStatus
 from src.app.tool.tools.csv_rag.crud.crud_file import (
     get_csv_file,
     create_csv_file,
@@ -36,31 +39,45 @@ def _scan_folder_sync(folder_path: str) -> List[str]:
 
 
 class CSVFileManager:
-    def __init__(self, db):
+    def __init__(self, db: Database):
         self.db = db
 
     async def compute_file_checksum(self, file_path: str) -> str:
-        return await asyncio.to_thread(_compute_file_checksum_sync, file_path)
+        norm_path = self._normalized_path(file_path)
+        return await asyncio.to_thread(_compute_file_checksum_sync, norm_path)
 
     async def scan_folder(self, folder_path: str) -> List[str]:
         return await asyncio.to_thread(_scan_folder_sync, folder_path)
 
     async def get_or_register_file(self, session: AsyncSession, file_path: str) -> Dict:
-        """
-        Ensure a CSVFile record exists and return a mapping. Also attach transient
-        boolean key '_needs_reingest' (True if new or checksum changed).
-        """
-        checksum = await self.compute_file_checksum(file_path)
-        existing = await get_csv_file(session, file_path)
+        norm_path = self._normalized_path(file_path)
+        checksum = await self.compute_file_checksum(norm_path)
+        existing = await get_csv_file(session, norm_path)
+
         if not existing:
-            created = await create_csv_file(session, file_path, checksum)
-            created["_needs_reingest"] = True
-            logger.info("Registered new CSV file: %s", file_path)
+            created = await create_csv_file(
+                session,
+                path=norm_path,
+                checksum=checksum,
+                status=EmbeddingStatus.PENDING.value,
+                last_row_index=0,
+            )
+            logger.info("Registered new CSV file: %s", norm_path)
             return created
+
         if existing.get("checksum") != checksum:
-            updated = await update_csv_file_checksum(session, existing["id"], checksum)
-            updated["_needs_reingest"] = True
-            logger.info("CSV file changed, will re-ingest: %s", file_path)
+            updated = await update_csv_file_checksum(
+                session,
+                file_id=existing["id"],
+                new_checksum=checksum,
+                status=EmbeddingStatus.PENDING.value,
+                last_row_index=0,
+            )
+            logger.info("CSV file changed, will re-ingest: %s", norm_path)
             return updated
-        existing["_needs_reingest"] = False
+
+        existing["status"] = EmbeddingStatus.DONE.value
         return existing
+
+    def _normalized_path(self, path: str) -> str:
+        return os.path.normpath(path).replace("\\", "/")

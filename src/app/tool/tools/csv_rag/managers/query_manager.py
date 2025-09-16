@@ -2,9 +2,10 @@
 CSVQueryManager (query → embed → vs → db)
 """
 
-import logging
+
 from typing import List, Dict, Any
 
+from src.config.logger import logging
 from src.app.tool.tools.csv_rag.crud.crud_row import select_rows_by_ids
 from src.app.tool.tools.csv_rag.embedding import embed_texts_async
 

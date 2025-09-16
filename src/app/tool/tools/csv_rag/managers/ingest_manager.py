@@ -3,12 +3,14 @@ CSVIngestManager (rows → db + embeddings + vs)
 """
 
 import json
-import logging
 from typing import Dict, Any, List, Iterable, AsyncIterable, Union
-
 from sqlalchemy import update
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.tool.tools.csv_rag.models import CSVFile
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.config.logger import logging
+
+from src.enum.embedding_status import EmbeddingStatus
 from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
 from src.app.tool.tools.csv_rag.models import CSVRow
 from src.app.tool.tools.csv_rag.embedding import embed_texts_async
@@ -23,23 +25,31 @@ class CSVIngestManager:
     def __init__(self, db, vector_store):
         self.db = db
         self.vs = vector_store
-
     async def ingest_rows(
         self,
         rows: Union[Iterable[Dict[str, Any]], AsyncIterable[Dict[str, Any]]],
+        file_meta: Dict,
         batch_size: int = 512,
     ):
         """
         Stream rows (sync iterable or async iterable), bulk-upsert into DB, compute embeddings
         for unique checksums per batch, push vectors to VS and set row embedding status.
         """
-
+        self.row_counter = file_meta.get("last_row_index", 0)
         async def _aiter():
             if hasattr(rows, "__aiter__"):
                 async for r in rows:
+                    r["file_id"] = file_meta["id"] 
+                    self.row_counter += 1
+                    if self.row_counter <= file_meta.get("last_row_index", 0):
+                        continue
                     yield r
             else:
                 for r in rows:
+                    r["file_id"] = file_meta["id"]
+                    self.row_counter += 1
+                    if self.row_counter <= file_meta.get("last_row_index", 0):
+                        continue
                     yield r
 
         buffer: List[Dict[str, Any]] = []
@@ -54,6 +64,7 @@ class CSVIngestManager:
 
                 buffer.append(
                     {
+                        "file_id": row.get("file_id"),
                         "external_id": row.get("external_id"),
                         "content": content,
                         "checksum": chk,
@@ -75,6 +86,7 @@ class CSVIngestManager:
                 await self._flush_insert_stream(
                     session, buffer, checksums, texts, metas
                 )
+        self._mark_as_done(file_meta)
 
     async def _flush_insert_stream(
         self,
@@ -141,3 +153,22 @@ class CSVIngestManager:
                     )
                 )
             await session.commit()
+
+        file_id = buffer[0].get("file_id")
+        if file_id:
+            await session.execute(
+                update(CSVFile)
+                .where(CSVFile.id == file_id)
+                .values(last_row_index=self.row_counter)
+            )
+            await session.commit()
+
+    async def _mark_as_done(self, file_meta):
+        async with self.db.SessionLocal() as session:
+            if file_meta.get("id"):
+                await session.execute(
+                    update(CSVFile)
+                    .where(CSVFile.id == file_meta["id"])
+                    .values(status=EmbeddingStatus.DONE.value, last_row_index=self.row_counter)
+                )
+                await session.commit()

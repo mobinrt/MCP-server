@@ -9,14 +9,12 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
-class UTCFormatter(logging.Formatter):
-    converter = datetime.fromtimestamp
 
+class UTCFormatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):
         dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
-        if datefmt:
-            return dt.strftime(datefmt)
-        return dt.isoformat()
+        return dt.strftime(datefmt) if datefmt else dt.isoformat()
+
 
 formatter = UTCFormatter(
     "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -28,10 +26,13 @@ file_handler = RotatingFileHandler(
 )
 file_handler.setFormatter(formatter)
 
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
-    handlers=[file_handler, console_handler],
+    handlers=[file_handler],
 )
+
+# console_handler = logging.StreamHandler()
+# console_handler.setFormatter(formatter)
