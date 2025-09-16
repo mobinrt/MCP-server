@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     #chromadb
     chroma_persist_directory: str = os.getenv("CHROMA_PERSIST_DIR", "chroma_data")
     chroma_collection_name: str = os.getenv("CHROMA_COLLECTION", "csv_rag_collection")
-
+    chroma_telemetry_enabled: str = os.getenv("CHROMA_TELEMETRY_ENABLED", "True")
+    
     #Database
     database_url: str = os.getenv("DATABASE_URL", "changeme")
 

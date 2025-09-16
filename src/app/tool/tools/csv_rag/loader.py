@@ -42,5 +42,7 @@ class CSVLoader:
         """
         async with aiofiles.open(file_path, mode="r", encoding="utf-8") as f:
             reader = aiocsv.AsyncDictReader(f)
-            async for idx, row in enumerate(reader):
+            idx=0
+            async for row in reader:
                 yield cls._format_row(idx, row)
+                idx += 1

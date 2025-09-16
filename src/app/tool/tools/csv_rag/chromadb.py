@@ -10,8 +10,8 @@ class ChromaVectorStore(VectorStoreBase):
     def __init__(self, collection_name: str = "csv_rows"):
         self.client = Client(
             ChromaSettings(
-                chroma_db_impl="duckdb+parquet",
-                persist_directory=settings.chroma_persist_directory,
+                is_persistent=True,
+                persist_directory=settings.chroma_persist_directory
             )
         )
         self.collection = self.client.get_or_create_collection(name=collection_name)
