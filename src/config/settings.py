@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     api_key: str = os.getenv("API_KEY", "changeme")
     
     #csv
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base")
     batch_size: int = int(os.getenv("BATCH_SIZE", "64"))
     embedding_batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "128"))
 

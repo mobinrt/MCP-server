@@ -12,6 +12,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "chromadb>=1.0.20",
     "langchain>=0.3.27",
+    "pandas>=2.3.2",
     "psycopg2-binary>=2.9.10",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",

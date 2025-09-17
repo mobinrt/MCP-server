@@ -15,7 +15,6 @@ from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
 from src.app.tool.tools.csv_rag.models import CSVRow
 from src.app.tool.tools.csv_rag.embedding import embed_texts_async
 from src.app.tool.tools.csv_rag.chromadb import vs_add_and_persist_async
-from src.enum.embedding_status import embeddingStatus
 from src.helpers.row_checksum import row_checksum
 
 logger = logging.getLogger(__name__)
@@ -118,7 +117,7 @@ class CSVIngestManager:
                 update(CSVRow)
                 .where(CSVRow.c.checksum.in_(unique_checksums))
                 .values(
-                    embedding_status=embeddingStatus.FAILED.value,
+                    embedding_status=EmbeddingStatus.FAILED.value,
                     embedding_error=str(e),
                 )
             )
@@ -149,7 +148,7 @@ class CSVIngestManager:
                     update(CSVRow)
                     .where(CSVRow.c.id == int(meta["row_id"]))
                     .values(
-                        embedding_status=embeddingStatus.DONE.value, vector_id=vec_id
+                        embedding_status=EmbeddingStatus.DONE.value, vector_id=vec_id
                     )
                 )
             await session.commit()

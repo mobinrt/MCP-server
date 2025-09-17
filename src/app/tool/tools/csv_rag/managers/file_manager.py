@@ -59,7 +59,7 @@ class CSVFileManager:
                 session,
                 path=norm_path,
                 checksum=checksum,
-                status=EmbeddingStatus.PENDING.value,
+                status=EmbeddingStatus.PENDING,
                 last_row_index=0,
             )
             logger.info("Registered new CSV file: %s", norm_path)
@@ -70,7 +70,7 @@ class CSVFileManager:
                 session,
                 file_id=existing["id"],
                 new_checksum=checksum,
-                status=EmbeddingStatus.PENDING.value,
+                status=EmbeddingStatus.PENDING,
                 last_row_index=0,
             )
             logger.info("CSV file changed, will re-ingest: %s", norm_path)

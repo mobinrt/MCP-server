@@ -6,7 +6,9 @@ from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-os.environ["CHROMA_TELEMETRY_ENABLED"] = settings.chroma_telemetry_enabled
+telemetry_enabled = os.environ["CHROMA_TELEMETRY_ENABLED"] = (
+    settings.chroma_telemetry_enabled
+)
 
 
 class VectorStore:
@@ -17,7 +19,6 @@ class VectorStore:
         if self._vs is None:
             persist_dir = settings.chroma_persist_directory
             collection = settings.chroma_collection_name
-            telemetry_enabled = settings.chroma_telemetry_enabled
 
             os.makedirs(persist_dir, exist_ok=True)
             logger.info(

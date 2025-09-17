@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.tool.tools.csv_rag.models import CSVFile
 from src.helpers.object_to_dict import model_to_dict
+from src.enum.embedding_status import EmbeddingStatus
 
 
 async def get_csv_file(session: AsyncSession, path: str) -> Optional[Dict[str, Any]]:
@@ -18,13 +19,26 @@ async def get_csv_file(session: AsyncSession, path: str) -> Optional[Dict[str, A
 
 
 async def create_csv_file(
-    session: AsyncSession, path: str, checksum: str
+    session: AsyncSession,
+    path: str,
+    checksum: str,
+    status: EmbeddingStatus,
+    last_row_index: int,
 ) -> Dict[str, Any]:
     """
     Insert new CSVFile record and return mapping.
     """
     normalized_path = os.path.normpath(path).replace("\\", "/")
-    stmt = insert(CSVFile).values(path=normalized_path, checksum=checksum).returning(CSVFile)
+    stmt = (
+        insert(CSVFile)
+        .values(
+            path=normalized_path,
+            checksum=checksum,
+            status=status.value,
+            last_row_index=last_row_index,
+        )
+        .returning(CSVFile)
+    )
     res = await session.execute(stmt)
     obj = res.scalar_one_or_none()
     dict = model_to_dict(obj) if obj else None
@@ -33,13 +47,19 @@ async def create_csv_file(
 
 
 async def update_csv_file_checksum(
-    session: AsyncSession, file_id: int, checksum: str
+    session: AsyncSession,
+    file_id: int,
+    checksum: str,
+    status: EmbeddingStatus,
+    last_row_index: int,
 ) -> Dict[str, Any]:
     """
     Update checksum for existing CSVFile and return mapping.
     """
     await session.execute(
-        update(CSVFile).where(CSVFile.id == file_id).values(checksum=checksum)
+        update(CSVFile)
+        .where(CSVFile.id == file_id)
+        .values(checksum=checksum, status=status.value, last_row_index=last_row_index)
     )
     await session.commit()
 
