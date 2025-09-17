@@ -2,7 +2,6 @@
 CSVIngestManager (rows → db + embeddings + vs)
 """
 
-import json
 from typing import Dict, Any, List, Iterable, AsyncIterable, Union
 from sqlalchemy import update
 
@@ -13,7 +12,7 @@ from src.config.logger import logging
 from src.enum.embedding_status import EmbeddingStatus
 from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
 from src.app.tool.tools.csv_rag.models import CSVRow
-from src.app.tool.tools.csv_rag.embedding import embed_texts_async
+from src.app.tool.tools.csv_rag.embedding import embed_texts_async, prepare_text_for_embedding
 from src.app.tool.tools.csv_rag.chromadb import vs_add_and_persist_async
 from src.helpers.row_checksum import row_checksum
 
@@ -59,7 +58,7 @@ class CSVIngestManager:
         async with self.db.SessionLocal() as session:
             async for row in _aiter():
                 chk = row_checksum(row)
-                content = json.dumps(row, ensure_ascii=False)
+                content = prepare_text_for_embedding(row)
 
                 buffer.append(
                     {
