@@ -27,7 +27,6 @@ async def bulk_upsert_rows(
                 "file_id": insert(CSVRow).excluded.file_id,
                 "content": insert(CSVRow).excluded.content,
                 "fields": insert(CSVRow).excluded.fields,
-                "extra": insert(CSVRow).excluded.extra,
             },
         )
         .returning(CSVRow.id, CSVRow.checksum)
@@ -54,4 +53,9 @@ async def select_rows_by_ids(
 
     sel = select(CSVRow).where(CSVRow.id.in_(ids))
     res = await session.execute(sel)
-    return [dict(r._mapping) for r in res.all()]
+    return [{str(k): v for k, v in r._mapping.items()} for r in res.all()]
+
+async def select_rows_by_vector_ids(session, vector_ids: List[str]):
+    stmt = select(CSVRow).where(CSVRow.vector_id.in_(vector_ids))
+    res = await session.execute(stmt)
+    return [row.to_dict() for row in res.scalars().all()]

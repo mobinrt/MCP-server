@@ -9,7 +9,8 @@ from src.app.tool.tools.csv_rag.managers.query_manager import CSVQueryManager
 from src.app.tool.tools.csv_rag.loader import CSVLoader
 from src.config.db import Database
 from src.base.vector_store import VectorStoreBase
-from src.enum.embedding_status import EmbeddingStatus
+from src.enum.csv_status import FileStatus
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ class CsvRagTool(BaseTool):
     def __init__(self, db: Database, vector_store: VectorStoreBase):
         self.db = db
         self.vs = vector_store
-        self.file_mgr = CSVFileManager(db)
-        self.ingest_mgr = CSVIngestManager(db, vector_store)
-        self.query_mgr = CSVQueryManager(db, vector_store)
+        self.file_mgr: CSVFileManager = CSVFileManager(db)
+        self.ingest_mgr: CSVIngestManager = CSVIngestManager(db, vector_store)
+        self.query_mgr: CSVQueryManager = CSVQueryManager(db, vector_store)
         self._ready = False
 
     @property
@@ -70,14 +71,38 @@ class CsvRagTool(BaseTool):
                 file_paths = await self.file_mgr.scan_folder(folder_path)
                 for p in file_paths:
                     file_meta = await self.file_mgr.get_or_register_file(session, p)
-                    if file_meta.get("status") == EmbeddingStatus.PENDING.value:
-                        logger.info("Ingesting file: %s", p)
 
-                        await self.ingest_mgr.ingest_rows(
-                            CSVLoader.stream_csv_async(p),
-                            batch_size=batch_size,
-                            file_meta=file_meta,
-                        )
+                    if file_meta.get("status") == FileStatus.DONE.value:
+                        logger.info("Skipping already ingested file: %s", p)
+                        continue
+
+                    if file_meta.get("status") in [
+                        FileStatus.PENDING.value,
+                        FileStatus.FAILED.value,
+                    ]:
+                        logger.info("Ingesting file: %s", p)
+                        try:
+                            logger.info(
+                                "start to ingest rows: %s", p
+                            )
+                            await self.ingest_mgr.ingest_rows(
+                                session,
+                                CSVLoader.stream_csv_async(p),
+                                batch_size=batch_size,
+                                file_meta=file_meta,
+                            )
+                            logger.info(
+                                "started to ingested and mark as done: %s", p
+                            )
+                            await self.file_mgr.mark_file_as_done(session, file_meta)
+                            logger.info(
+                                "Successfully ingested and marked as done: %s", p
+                            )
+
+                        except Exception as e:
+                            logger.error(f"Ingestion failed for file {p}: {e}")
+                            await self.file_mgr.mark_file_as_failed(session, file_meta)
+                            await session.rollback()
                     else:
                         logger.info("Skipping unchanged file: %s", p)
 
