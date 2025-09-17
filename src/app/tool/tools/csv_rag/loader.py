@@ -19,7 +19,7 @@ class CSVLoader:
         Synchronous: load entire CSV into memory as a list of dicts.
         """
         docs = []
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for idx, row in enumerate(reader):
                 docs.append(cls._format_row(idx, row))
@@ -30,7 +30,7 @@ class CSVLoader:
         """
         Synchronous streaming generator over CSV rows.
         """
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for idx, row in enumerate(reader):
                 yield cls._format_row(idx, row)
@@ -40,7 +40,7 @@ class CSVLoader:
         """
         Asynchronous streaming generator using aiofiles + aiocsv.
         """
-        async with aiofiles.open(file_path, mode="r", encoding="utf-8") as f:
+        async with aiofiles.open(file_path, mode="r", encoding="utf-8-sig") as f:
             reader = aiocsv.AsyncDictReader(f)
             idx=0
             async for row in reader:

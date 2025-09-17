@@ -11,8 +11,8 @@ class CSVRow(BaseModel):
     file_id: Mapped[int] = mapped_column(
         ForeignKey("csv_files.id", ondelete="CASCADE"), nullable=False
     )
-    external_id: Mapped[str] = mapped_column(
-        String, unique=True, index=True, nullable=False
+    external_id: Mapped[int] = mapped_column(
+        Integer, index=True, nullable=False
     )
 
     content: Mapped[str] = mapped_column(Text, nullable=False)

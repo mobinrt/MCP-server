@@ -76,7 +76,11 @@ class CSVFileManager:
             logger.info("CSV file changed, will re-ingest: %s", norm_path)
             return updated
 
-        existing["status"] = EmbeddingStatus.DONE.value
+        logger.info(
+            "CSV file unchanged: %s (status=%s)",
+            norm_path,
+            existing.get("status"),
+        )
         return existing
 
     def _normalized_path(self, path: str) -> str:

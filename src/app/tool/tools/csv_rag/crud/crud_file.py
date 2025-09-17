@@ -49,7 +49,7 @@ async def create_csv_file(
 async def update_csv_file_checksum(
     session: AsyncSession,
     file_id: int,
-    checksum: str,
+    new_checksum: str,
     status: EmbeddingStatus,
     last_row_index: int,
 ) -> Dict[str, Any]:
@@ -59,7 +59,7 @@ async def update_csv_file_checksum(
     await session.execute(
         update(CSVFile)
         .where(CSVFile.id == file_id)
-        .values(checksum=checksum, status=status.value, last_row_index=last_row_index)
+        .values(checksum=new_checksum, status=status.value, last_row_index=last_row_index)
     )
     await session.commit()
 

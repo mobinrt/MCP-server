@@ -77,13 +77,13 @@ def setup_logging():
     sys.stderr = StreamToLogger(logging.getLogger("STDERR"), logging.ERROR)
 
     # --- SQLAlchemy Logging ---
-    logging.getLogger("sqlalchemy.engine").setLevel(
-        logging.WARNING
-    )  # queries (set to INFO for full SQL logs)
-    logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)  # DB pool events
-    logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy").setLevel(logging.ERROR)  # only errors
+    # logging.getLogger("sqlalchemy.engine").setLevel(
+    #     logging.WARNING
+    # )  # queries (set to INFO for full SQL logs)
+    # logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)  # DB pool events
+    # logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
+    # logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
+    # logging.getLogger("sqlalchemy").setLevel(logging.ERROR)  # only errors
 
     # Optional: if you want SQL statements logged, uncomment this:
     # logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)

@@ -12,7 +12,10 @@ from src.config.logger import logging
 from src.enum.embedding_status import EmbeddingStatus
 from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
 from src.app.tool.tools.csv_rag.models import CSVRow
-from src.app.tool.tools.csv_rag.embedding import embed_texts_async, prepare_text_for_embedding
+from src.app.tool.tools.csv_rag.embedding import (
+    embed_texts_async,
+    prepare_text_for_embedding,
+)
 from src.app.tool.tools.csv_rag.chromadb import vs_add_and_persist_async
 from src.helpers.row_checksum import row_checksum
 
@@ -23,6 +26,7 @@ class CSVIngestManager:
     def __init__(self, db, vector_store):
         self.db = db
         self.vs = vector_store
+
     async def ingest_rows(
         self,
         rows: Union[Iterable[Dict[str, Any]], AsyncIterable[Dict[str, Any]]],
@@ -34,17 +38,18 @@ class CSVIngestManager:
         for unique checksums per batch, push vectors to VS and set row embedding status.
         """
         self.row_counter = file_meta.get("last_row_index", 0)
+
         async def _aiter():
             if hasattr(rows, "__aiter__"):
                 async for r in rows:
-                    r["file_id"] = file_meta["id"] 
+                    r["metadata"]["file_id"] = file_meta["id"]
                     self.row_counter += 1
                     if self.row_counter <= file_meta.get("last_row_index", 0):
                         continue
                     yield r
             else:
                 for r in rows:
-                    r["file_id"] = file_meta["id"]
+                    r["metadata"]["file_id"] = file_meta["id"]
                     self.row_counter += 1
                     if self.row_counter <= file_meta.get("last_row_index", 0):
                         continue
@@ -57,16 +62,18 @@ class CSVIngestManager:
 
         async with self.db.SessionLocal() as session:
             async for row in _aiter():
-                chk = row_checksum(row)
-                content = prepare_text_for_embedding(row)
+                original_row = row["metadata"]
+
+                chk = row_checksum(original_row)
+                content = prepare_text_for_embedding(original_row)
 
                 buffer.append(
                     {
-                        "file_id": row.get("file_id"),
-                        "external_id": row.get("external_id"),
+                        "file_id": original_row.get("file_id"),
+                        "external_id": int(original_row.get("external_id")),
                         "content": content,
                         "checksum": chk,
-                        "fields": {k: v for k, v in row.items()},
+                        "fields": {k: v for k, v in original_row.items()},
                         "extra": None,
                     }
                 )
@@ -114,7 +121,7 @@ class CSVIngestManager:
         except Exception as e:
             await session.execute(
                 update(CSVRow)
-                .where(CSVRow.c.checksum.in_(unique_checksums))
+                .where(CSVRow.checksum.in_(unique_checksums))
                 .values(
                     embedding_status=EmbeddingStatus.FAILED.value,
                     embedding_error=str(e),
@@ -145,7 +152,7 @@ class CSVIngestManager:
             for vec_id, _, meta in vs_batch:
                 await session.execute(
                     update(CSVRow)
-                    .where(CSVRow.c.id == int(meta["row_id"]))
+                    .where(CSVRow.id == int(meta["row_id"]))
                     .values(
                         embedding_status=EmbeddingStatus.DONE.value, vector_id=vec_id
                     )
@@ -167,6 +174,9 @@ class CSVIngestManager:
                 await session.execute(
                     update(CSVFile)
                     .where(CSVFile.id == file_meta["id"])
-                    .values(status=EmbeddingStatus.DONE.value, last_row_index=self.row_counter)
+                    .values(
+                        status=EmbeddingStatus.DONE.value,
+                        last_row_index=self.row_counter,
+                    )
                 )
                 await session.commit()
