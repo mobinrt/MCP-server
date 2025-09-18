@@ -8,7 +8,7 @@ from src.config import Database
 from src.config.logger import logging
 from src.base.vector_store import VectorStoreBase
 from src.app.tool.tools.csv_rag.crud.crud_row import select_rows_by_vector_ids
-from src.app.tool.tools.csv_rag.embedding import embed_texts_async
+from src.services.embedding import embed_texts_async
 
 logger = logging.getLogger(__name__)
 

@@ -10,6 +10,7 @@ dependencies = [
     "aiohttp>=3.12.15",
     "alembic>=1.16.5",
     "asyncpg>=0.30.0",
+    "celery>=5.5.3",
     "chromadb>=1.0.20",
     "langchain>=0.3.27",
     "pandas>=2.3.2",

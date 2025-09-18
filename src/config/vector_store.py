@@ -1,7 +1,7 @@
 import os
 
 from src.config.logger import logging
-from src.app.tool.tools.csv_rag.chromadb import ChromaVectorStore
+from src.services.chromadb import ChromaVectorStore
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)

@@ -6,11 +6,11 @@ from src.app.tool.tools.csv_rag.models import CSVFile, CSVRow
 from src.config.logger import logging
 from src.enum.csv_status import EmbeddingStatus
 from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
-from src.app.tool.tools.csv_rag.embedding import (
+from src.services.embedding import (
     embed_texts_async,
     prepare_text_for_embedding,
 )
-from src.app.tool.tools.csv_rag.chromadb import vs_add_and_persist_async
+from src.services.chromadb import vs_add_and_persist_async
 from src.helpers.row_util import row_checksum
 from src.app.tool.tools.csv_rag.schema import IncomingRow, PreparedRow, FileMeta
 
