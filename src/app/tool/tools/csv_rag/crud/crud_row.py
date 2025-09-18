@@ -1,9 +1,11 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Sequence
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy import case, update
 
 from src.app.tool.tools.csv_rag.models import CSVRow
+from src.enum.csv_status import EmbeddingStatus
 
 
 async def bulk_upsert_rows(
@@ -36,10 +38,42 @@ async def bulk_upsert_rows(
     await session.commit()
 
     mapping: Dict[str, int] = {}
-    
-    for db_id, checksum in res.fetchall():
+
+    for row in res.fetchall():
+        db_id = row.id
+        checksum = row.checksum
         mapping[str(checksum)] = int(db_id)
     return mapping
+
+
+async def mark_rows_done_with_vector(
+    session: AsyncSession,
+    row_ids: Sequence[int],
+    vector_ids: Sequence[str],
+):
+    """
+    Bulk update all given row_ids with DONE status and their vector_ids
+    using a single SQL UPDATE.
+    """
+    if not row_ids:
+        return
+
+    case_expr = case(
+        (CSVRow.id == int(row_id), vec_id)
+        for row_id, vec_id in zip(row_ids, vector_ids)
+    )
+
+    stmt = (
+        update(CSVRow)
+        .where(CSVRow.id.in_(list(map(int, row_ids))))
+        .values(
+            embedding_status=EmbeddingStatus.DONE.value,
+            vector_id=case_expr,
+        )
+    )
+
+    await session.execute(stmt)
+    await session.commit()
 
 
 async def select_rows_by_ids(
@@ -54,6 +88,7 @@ async def select_rows_by_ids(
     sel = select(CSVRow).where(CSVRow.id.in_(ids))
     res = await session.execute(sel)
     return [{str(k): v for k, v in r._mapping.items()} for r in res.all()]
+
 
 async def select_rows_by_vector_ids(session, vector_ids: List[str]):
     stmt = select(CSVRow).where(CSVRow.vector_id.in_(vector_ids))

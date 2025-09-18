@@ -10,14 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config.logger import logging
 
 from src.enum.csv_status import EmbeddingStatus
-from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
+from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows, mark_rows_done_with_vector
 from src.app.tool.tools.csv_rag.models import CSVRow
 from src.app.tool.tools.csv_rag.embedding import (
     embed_texts_async,
     prepare_text_for_embedding,
 )
 from src.app.tool.tools.csv_rag.chromadb import vs_add_and_persist_async
-from src.helpers.row_checksum import row_checksum
+from src.helpers.row_util import row_checksum
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class CSVIngestManager:
 
     async def ingest_rows(
         self,
-        session: AsyncSession, 
+        session: AsyncSession,
         rows: Union[Iterable[Dict[str, Any]], AsyncIterable[Dict[str, Any]]],
         file_meta: Dict,
         batch_size: int = 512,
@@ -87,9 +87,7 @@ class CSVIngestManager:
                 buffer, checksums, texts, metas = [], [], [], []
 
         if buffer:
-            await self._flush_insert_stream(
-                session, buffer, checksums, texts, metas
-            )
+            await self._flush_insert_stream(session, buffer, checksums, texts, metas)
 
     async def _flush_insert_stream(
         self,

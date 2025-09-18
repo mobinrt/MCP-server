@@ -64,11 +64,10 @@ async def update_csv_file_checksum(
             checksum=new_checksum, status=status.value, last_row_index=last_row_index
         )
     )
-    await session.commit()
-
     sel = select(CSVFile).where(CSVFile.id == file_id)
     res = await session.execute(sel)
     obj = res.scalar_one_or_none()
+    await session.commit()
     return model_to_dict(obj) if obj else None
 
 
@@ -86,8 +85,8 @@ async def update_csv_file_status(
         .returning(CSVFile)
     )
     res = await session.execute(stmt)
-    await session.commit()
     obj = res.scalar_one_or_none()
+    await session.commit()
     return model_to_dict(obj) if obj else None
 
 

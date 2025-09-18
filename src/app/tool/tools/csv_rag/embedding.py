@@ -22,7 +22,16 @@ def prepare_text_for_embedding(row: Dict[str, Any]) -> str:
     Convert a CSV row into a structured text string for embedding.
     Filters out noise fields like IDs, phone numbers, URLs.
     """
-    ignore_keys = {"id", "external_id", "phone", "phone_number", "map_link", "url", "link", "number"}
+    ignore_keys = {
+        "id",
+        "external_id",
+        "phone",
+        "phone_number",
+        "map_link",
+        "url",
+        "link",
+        "number",
+    }
     parts = []
 
     for k, v in row.items():
