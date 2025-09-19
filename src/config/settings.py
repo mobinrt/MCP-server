@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import Optional
+from src.enum.executor import Executor
 
 load_dotenv()
 
@@ -28,9 +29,7 @@ class Settings(BaseSettings):
     # Celery
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-    celery_result_expires: int = int(
-        os.getenv("CELERY_RESULT_EXPIRES", "3600")
-    )  
+    celery_result_expires: int = int(os.getenv("CELERY_RESULT_EXPIRES", "3600"))
 
     worker_task_soft_time_limit: int = int(
         os.getenv("WORKER_TASK_SOFT_TIME_LIMIT", "300")
@@ -51,12 +50,13 @@ class Settings(BaseSettings):
     )
 
     worker_max_retries: int = int(os.getenv("WORKER_MAX_RETRIES", "3"))
-    celery_rate_limit: Optional[str] = os.getenv(
-        "CELERY_RATE_LIMIT", None
-    )
+    celery_rate_limit: Optional[str] = os.getenv("CELERY_RATE_LIMIT", None)
 
     # Adapter timeout
     tool_celery_timeout: int = int(os.getenv("TOOL_CELERY_TIMEOUT", "300"))
 
+    # Executor
+    tool_executor: str = os.getenv("TOOL_EXECUTOR", Executor.IN_PROCESS.value).lower()
+    env_key:str = os.getenv("ENV_KEY", default=None) #base url
 
 settings = Settings()
