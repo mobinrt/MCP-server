@@ -41,10 +41,15 @@ class CeleryAdapter(AdapterBase):
 
     async def run(self, **kwargs) -> Any:
         def _send_and_get():
-            async_result = self._celery.send_task(
-                "run_tool_task", args=[self._name, kwargs]
-            )
-            return async_result.get(timeout=self._timeout)
+            try:
+                async_result = self._celery.send_task(
+                    "run_tool_task", args=[self._name, kwargs]
+                )
+                return async_result.get(timeout=self._timeout)
+            except Exception as e:
+                logger.exception("Celery task for %s failed: %s", self._name, e)
+                raise RuntimeError(f"Celery task for {self._name} failed") from e
 
-        loop = asyncio.get_event_loop()
+
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _send_and_get)
