@@ -1,6 +1,6 @@
 from fastmcp import Registry
 from src.config import db
-from src.config.vs import VectorStore
+from src.config.vector_store import VectorStore
 from src.app.tool.tools.csv_rag.rag import CsvRagTool
 from src.app.tool.tools.weather.weather import WeatherTool
 from src.config.logger import logging
