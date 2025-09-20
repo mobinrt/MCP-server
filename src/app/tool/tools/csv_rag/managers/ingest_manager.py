@@ -12,7 +12,7 @@ from src.services.embedding import (
 )
 from src.services.chromadb import vs_add_and_persist_async
 from src.helpers.row_util import row_checksum
-from src.app.tool.tools.csv_rag.schema import IncomingRow, PreparedRow, FileMeta
+from src.app.tool.tools.csv_rag.schemas import IncomingRow, PreparedRow, FileMeta
 
 
 logger = logging.getLogger(__name__)

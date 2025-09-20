@@ -1,21 +1,39 @@
-import os
-import asyncio
-from fastmcp import Server
-from src.app.tool.registry import registry, initialize_tools
+import warnings
+import anyio
+import uvicorn
+
 from src.config.logger import logging
+
+from src.app.tool.registry import registry
+from src.config.settings import settings
+from src.app.tool import init_tools
 
 logger = logging.getLogger(__name__)
 
+# warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-async def main(preload: bool = False):
-    await initialize_tools(preload=preload)
+app = registry.http_app()
 
-    server = Server(
-        registry=registry, host="0.0.0.0", port=int(os.getenv("MCP_PORT", "8000"))
-    )
-    logger.info("Starting MCP server on 0.0.0.0:%s", os.getenv("MCP_PORT", "8000"))
-    await server.start()
+
+async def async_init():
+    """Initialize tools before starting server."""
+
+    logger.info("Initializing tools...")
+    await init_tools(registry)
+    logger.info("Tools initialized successfully.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main(preload=False))
+    anyio.run(async_init)
+
+    port = int(settings.port)
+    host = settings.host
+
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=8001,
+        log_level="info",
+        access_log=True,
+        use_colors=True,
+    )

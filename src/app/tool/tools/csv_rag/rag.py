@@ -1,4 +1,3 @@
-# src/app/tool/tools/csv_rag/rag.py
 from src.config.logger import logging
 from src.base.base_tool import BaseTool
 from src.helpers.pg_lock import advisory_lock
@@ -10,7 +9,7 @@ from src.app.tool.tools.csv_rag.loader import CSVLoader
 from src.config.db import Database
 from src.base.vector_store import VectorStoreBase
 from src.enum.csv_status import FileStatus
-
+from .schemas import RagArgs
 
 logger = logging.getLogger(__name__)
 
@@ -106,5 +105,7 @@ class CsvRagTool(BaseTool):
                     else:
                         logger.info("Skipping unchanged file: %s", p)
 
-    async def run(self, query: str, top_k: int = 5):
-        return await self.query_mgr.search(query, top_k)
+    async def run(self, args: dict):
+        parsed = RagArgs(**args)
+        res = await self.query_mgr.search(parsed.query, parsed.top_k)
+        return {"result": res}

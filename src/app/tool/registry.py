@@ -1,123 +1,162 @@
-import os
+"""
+This module provides:
+- Registry.instance() -> singleton Registry that holds a FastMCP server
+- register_function(func, name=None) -> registers a plain function as a FastMCP tool
+- register_instance_method(instance, method_name='run', name=None) -> wraps an instance method and registers it
+- initialize_instances(instances) -> calls async initialize() on the given instances (if present)
+- run(...) -> starts the FastMCP server (transport + host + port)
+- http_app() -> returns ASGI app for uvicorn/gunicorn if you want ASGI deployment
+"""
+
+from __future__ import annotations
+import inspect
 import asyncio
-from fastmcp import Registry
-
-from src.config.logger import logging
-
-logger = logging.getLogger(__name__)
-
-registry = Registry(name="mcp-server")
-
-_csv_rag_tool = None
-_weather_tool = None
-_agent_tool = None
+from typing import Callable, Any, Optional, Iterable, Dict
+from src.helpers.singleton import SingletonMeta
+from src.base.base_tool import BaseTool
+from fastmcp import FastMCP
+from fastmcp.server.http import create_streamable_http_app
 
 
-async def _ensure_csv_rag_tool():
-    global _csv_rag_tool
-    if _csv_rag_tool is None:
-        from src.config import db
-        from src.config.vector_store import VectorStore
-        from src.app.tool.tools.csv_rag.rag import CsvRagTool
-
-        vs = VectorStore()
-        _csv_rag_tool = CsvRagTool(db, vs)
-        await _csv_rag_tool.initialize()
-    return _csv_rag_tool
+def _method_param_info(method: Callable):
+    """Return list of parameter names excluding `self` for bound/instance methods."""
+    sig = inspect.signature(method)
+    params = [p for p in sig.parameters.values() if p.name != "self"]
+    return params
 
 
-async def _ensure_weather_tool():
-    global _weather_tool
-    if _weather_tool is None:
-        from src.app.tool.tools.weather.weather import WeatherTool
+class Registry(metaclass=SingletonMeta):
+    _singleton_instance: "Registry" = None
 
-        _weather_tool = WeatherTool()
-        await _weather_tool.initialize()
-    return _weather_tool
+    @classmethod
+    def instance(cls, *args, **kwargs) -> "Registry":
+        if cls._singleton_instance is None:
+            cls._singleton_instance = cls(*args, **kwargs)
+        return cls._singleton_instance
 
+    def __init__(self, name: str = "mcp-server"):
+        self.mcp = FastMCP(name=name)
+        self.tools: Dict[str, Callable] = {}
 
-async def _ensure_agent_tool():
-    global _agent_tool
-    if _agent_tool is None:
-        from src.app.agent.agent_tool import GraphAgent
+    def register_function(
+        self, func: Callable, name: Optional[str] = None, **tool_kwargs
+    ) -> Callable:
+        """
+        Register a plain function as an MCP tool.
+        - func: the callable (sync or async)
+        - name: optional explicit tool name (e.g. 'csv_rag.query')
+        - tool_kwargs: passed to the FastMCP decorator (description, tags, etc.)
+        Returns the original function (so it can be used as decorator style too).
+        """
+        if name:
+            decorator = self.mcp.tool(name=name, **tool_kwargs)
+        else:
+            decorator = self.mcp.tool(**tool_kwargs)
 
-        _agent_tool = GraphAgent()
-        await _agent_tool.initialize()
-    return _agent_tool
+        decorated = decorator(func)
+        tool_name = name or getattr(func, "__name__", None)
+        self.tools[tool_name] = decorated
+        return decorated
 
-
-@registry.tool(name="csv_rag")
-async def csv_rag(query: str, top_k: int = 5):
-    tool = await _ensure_csv_rag_tool()
-    return await tool.run(query, top_k)
-
-
-@registry.tool(name="csv_rag_ingest")
-async def csv_rag_ingest(folder_path: str, batch_size: int = 512):
-    """
-    Start ingestion for a folder. By default this enqueues a Celery job (non-blocking).
-    To run ingestion inline (for local testing), set USE_CELERY_INGEST=0 in env.
-    """
-    use_celery = os.getenv("USE_CELERY_INGEST", "1") != "0"
-    if use_celery:
-        from celery import Celery
-
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        celery_app = Celery("mcp_client", broker=redis_url, backend=redis_url)
-
-        def _send_task():
-            async_result = celery_app.send_task(
-                "ingest_tool_task",
-                args=[
-                    "csv_rag",
-                    {"folder_path": folder_path, "batch_size": batch_size},
-                ],
-            )
-            return async_result.get(
-                timeout=int(os.getenv("TOOL_CELERY_TIMEOUT", "600"))
+    def register_instance_method(
+        self,
+        instance: BaseTool,
+        method_name: str = "run",
+        name: Optional[str] = None,
+        **tool_kwargs,
+    ):
+        if not hasattr(instance, method_name):
+            raise AttributeError(
+                f"Instance {instance!r} has no attribute {method_name}"
             )
 
-        loop = asyncio.get_event_loop()
+        method = getattr(instance, method_name)
+        params = _method_param_info(method)
 
-        result = await loop.run_in_executor(None, _send_task)
-        return {"status": "enqueued", "celery_result": result}
-    else:
-        tool = await _ensure_csv_rag_tool()
-        await tool.ingest_folder(folder_path, batch_size)
-        return {"status": "ingestion_finished"}
+        """
+        Decide wrapper behavior:
+        # - no params -> call method()
+        # - single param named 'args' or annotated as dict -> call method(args)
+        # - otherwise -> call method(**args) (expecting keys in args to match param names)
+        """
+        # single_args_param = len(params) == 1 and (
+        #     params[0].name == "args"
+        #     or (params[0].annotation is dict)
+        #     or (params[0].annotation == Dict)
+        # )
+
+        # no_params = len(params) == 0
+
+        if inspect.iscoroutinefunction(method):
+            
+            async def wrapper(args: dict):
+                return await method(args)
+            # elif single_args_param:
+
+            #     async def wrapper(args: dict):
+            #         return await method(args)
+            # else:
+            #     # expects named params -> forward as kwargs
+            #     async def wrapper(args: dict):
+            #         if not isinstance(args, dict):
+            #             raise TypeError("Tool arguments must be an object/dict.")
+            #         return await method(**args)
+        else:
+            # if no_params:
+
+            #     def wrapper():
+            #         return method()
+            # elif single_args_param:
+
+                def wrapper(args: dict):
+                    return method(args)
+            # else:
+
+            #     def wrapper(args: dict):
+            #         if not isinstance(args, dict):
+            #             raise TypeError("Tool arguments must be an object/dict.")
+            #         return method(**args)
+
+        """
+        tool_name = name or f"{instance.__class__.__name__}.{method_name}
+        U can add method name, if the logic changed.
+        """
+        tool_name = name or f"{instance.__class__.__name__}"
+        tool_description = f"{instance.description}"
+        decorated = self.mcp.tool(name=tool_name, **tool_kwargs, description=tool_description)(wrapper)
+        self.tools[tool_name] = decorated
+        return decorated
+
+    async def initialize_instances(self, instances: Iterable[Any]) -> None:
+        """
+        Call `initialize()` on all provided instances that have it. Run concurrently.
+        """
+        tasks = []
+        for inst in instances:
+            init = getattr(inst, "initialize", None)
+            if callable(init):
+                ret = init()
+                if inspect.isawaitable(ret):
+                    tasks.append(ret)
+        if tasks:
+            await asyncio.gather(*tasks)
+
+    def http_app(self):
+        """
+        Return an ASGI app (FastAPI/Starlette) suitable for ASGI servers (uvicorn/gunicorn).
+        """
+        return self.mcp.http_app()
+
+    def run(
+        self, host: str = "0.0.0.0", port: int = 8000, transport: Optional[str] = None
+    ):
+        """
+        Start the FastMCP server. transport can be 'http' or 'stdio' (None uses default).
+        """
+        if transport:
+            self.mcp.run(transport=transport, host=host, port=port)
+        else:
+            self.mcp.run(host=host, port=port)
 
 
-@registry.tool(name="weather")
-async def weather(city: str):
-    tool = await _ensure_weather_tool()
-    return await tool.run(city)
-
-
-@registry.tool(name="agent_chat")
-async def agent_chat(user_input: str):
-    """
-    Agent tool that uses the standalone GraphAgent.
-    This is intentionally independent and will not touch csv_rag or weather modules.
-    """
-    agent = await _ensure_agent_tool()
-    resp = await agent.run(user_input)
-    return {"response": resp}
-
-
-@registry.tool(name="health_ping")
-async def health_ping():
-    return {"status": "ok"}
-
-
-async def initialize_tools(preload: bool = False):
-    """
-    Optionally preload all tools (set preload=True). Otherwise, tools will
-    be instantiated lazily on the first call to each endpoint.
-    Preload useful for warm workers or integration tests.
-    """
-    logger.info("Initializing tools (preload=%s)...", preload)
-    if preload:
-        await _ensure_agent_tool()
-        await _ensure_weather_tool()
-        await _ensure_csv_rag_tool()
-    logger.info("Initialization complete.")
+registry = Registry.instance(name="mcp-server")

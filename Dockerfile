@@ -14,6 +14,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY . .
 
+# --- Add non-root user ---
+# Create a system group and user
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+USER appuser
+
 EXPOSE 8000
 
 

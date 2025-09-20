@@ -25,7 +25,7 @@ class BaseTool(ABC):
         pass
 
     @abstractmethod
-    async def run(self, payload: Dict[str, Any]) -> Any:
+    async def run(self, args: Dict[str, Any]) -> Dict[str, Any]:
         pass
 
     async def initialize(self) -> None:

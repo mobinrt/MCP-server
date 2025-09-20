@@ -3,7 +3,13 @@ from typing import (
     Any,
     TypedDict,
 )
+from pydantic import BaseModel
 from datetime import datetime
+
+
+class RagArgs(BaseModel):
+    query: str
+    top_k: int
 
 
 class RowMeta(TypedDict):

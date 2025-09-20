@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import Optional
-from src.enum.executor import Executor
+
 
 load_dotenv()
 
@@ -14,11 +14,21 @@ class Settings(BaseSettings):
     api_key: str = os.getenv("API_KEY", "changeme")
     llm_model: str = os.getenv("LANGUAGE_MODEL", "qwen2.5:3b")
     llm_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    mcp_mode: str = os.getenv("MCP_HTTP_MODE", "stream")
+    
+    #LOG
+    log_dir: str = os.getenv("LOG_DIR", "logs")
+    log_file: str = os.path.join(log_dir, "app.log")
+    log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
+
     # csv
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base")
     batch_size: int = int(os.getenv("BATCH_SIZE", "64"))
     embedding_batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "128"))
 
+    #Weather
+    weather_api_key: str = str(os.getenv("WEATHER_API_KEY"))
+    weather_url: str = str(os.getenv("WEATHER_URL"))
     # chromadb
     chroma_persist_directory: str = os.getenv("CHROMA_PERSIST_DIR", "chroma_data")
     chroma_collection_name: str = os.getenv("CHROMA_COLLECTION", "csv_rag_collection")
@@ -56,9 +66,7 @@ class Settings(BaseSettings):
     # Adapter timeout
     tool_celery_timeout: int = int(os.getenv("TOOL_CELERY_TIMEOUT", "300"))
 
-    # Executor
-    tool_executor: str = os.getenv("TOOL_EXECUTOR", Executor.IN_PROCESS.value).lower()
-    env_key: str = os.getenv("ENV_KEY", default=None)  # base url
 
+    
 
 settings = Settings()

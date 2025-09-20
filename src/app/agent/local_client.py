@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 from langchain_community.chat_models import ChatOllama
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage

@@ -27,6 +27,7 @@ services:
       dockerfile: Dockerfile
     container_name: app
     restart: always
+    user: "1000:1000"
     depends_on:
       - postgres
       - redis
@@ -49,6 +50,7 @@ services:
       dockerfile: Dockerfile
     container_name: celery
     restart: always
+    user: appuser
     depends_on:
       - redis
       - postgres

@@ -4,10 +4,12 @@ import sys
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone
 
+from .settings import settings
+
 # --- Configuration ---
-LOG_DIR = os.getenv("LOG_DIR", "logs")
-LOG_FILE = os.path.join(LOG_DIR, "app.log")
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_DIR = settings.log_dir
+LOG_FILE = settings.log_file
+LOG_LEVEL = settings.log_level
 MAX_BYTES = 5 * 1024 * 1024
 BACKUP_COUNT = 5
 
