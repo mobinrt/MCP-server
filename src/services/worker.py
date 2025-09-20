@@ -1,6 +1,4 @@
 """
-FastMCP-compatible Celery worker for MCP server (production-ready).
-
 Key production features:
 - Safe execution of sync/async tool methods
 - Redis-backed idempotent ingestion locks with task-id stored
@@ -27,7 +25,7 @@ from src.config.logger import logging
 from src.config.settings import settings
 from src.config.celery import CELERY_CONFIG
 
-from src.app.tool.fastmcp_registry import registry
+from src.app.tool.registry import registry
 
 logger = logging.getLogger(__name__)
 

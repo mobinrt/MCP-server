@@ -22,7 +22,5 @@ async def test_csv_rag_run_empty():
 
 @pytest.mark.asyncio
 async def test_weather_run_invalid_city():
-    import pytest
-
     with pytest.raises(Exception):
         await weather_tool.run("unknown_city")

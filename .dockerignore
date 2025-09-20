@@ -20,3 +20,6 @@ Dockerfile
 docker-compose.yml
 .git
 .gitignore
+postgres_data/
+chroma_data/
+hf_cache/

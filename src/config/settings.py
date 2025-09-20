@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     host: str = os.getenv("APP_HOST", "0.0.0.0")
     port: int = os.getenv("APP_PORT", 8000)
     api_key: str = os.getenv("API_KEY", "changeme")
-
+    llm_model: str = os.getenv("LANGUAGE_MODEL", "qwen2.5:3b")
+    llm_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
     # csv
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base")
     batch_size: int = int(os.getenv("BATCH_SIZE", "64"))
@@ -57,6 +58,7 @@ class Settings(BaseSettings):
 
     # Executor
     tool_executor: str = os.getenv("TOOL_EXECUTOR", Executor.IN_PROCESS.value).lower()
-    env_key:str = os.getenv("ENV_KEY", default=None) #base url
+    env_key: str = os.getenv("ENV_KEY", default=None)  # base url
+
 
 settings = Settings()
