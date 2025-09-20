@@ -133,7 +133,6 @@ async def main():
 
     for q in [
         "What's the weather in Tehran?",
-        "Are you alive? (ping)",
     ]:
         print(f"\n=== Running query: {q} ===")
         result = await graph.ainvoke({"query": q})

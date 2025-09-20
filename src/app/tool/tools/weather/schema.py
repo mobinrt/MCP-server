@@ -21,13 +21,11 @@ def parse_weather(api_response: dict) -> WeatherExtract:
     Based on OpenWeather response
     """
     return WeatherExtract(
-        city=api_response["location"]["name"],
-        country=api_response["location"]["country"],
-        temp_c=api_response["current"]["temp_c"],
-        localtime=datetime.strptime(
-            api_response["location"]["localtime"], "%Y-%m-%d %H:%M"
-        ),
-        humidity=api_response["current"]["humidity"],
-        feelslike_c=api_response["current"]["feelslike_c"],
-        wind_kph=api_response["current"]["wind_kph"],
+        city=api_response["name"],
+        country=api_response["sys"]["country"],
+        temp_c=api_response["main"]["temp"],
+        localtime=datetime.fromtimestamp(api_response["dt"]),
+        humidity=api_response["main"]["humidity"],
+        feelslike_c=api_response["main"]["feels_like"],
+        wind_kph=api_response["wind"]["speed"] * 3.6,
     )
