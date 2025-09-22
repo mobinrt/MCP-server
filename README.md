@@ -19,6 +19,41 @@ It integrates **PostgreSQL, ChromaDB, Redis, Celery, and FastMCP**, with a modul
 
 ---
 
+---
+## Project Structure
+```bash
+        |   main.py                 # Entry point, starts MCP server
+        |   agent.py                # Agent integration (LangGraph/LangChain)
+        |   docker-compose.yml      # Runs DB + server stack
+        |   Dockerfile              # Container build
+        |   requirements.txt        # Python dependencies
+        |   pyproject.toml          # uv
+        |
+        +---src
+        |   +---app
+        |   |   +---tool
+        |   |   |   |   registry.py         # Registry (FastMCP wrapper)
+        |   |   |   |   __init__.py         # Tool initialization (factories + lazy loading)
+        |   |   |   \---tools               # Actual tool implementations
+        |   |   |       +---csv_rag         # CSV RAG (loader, managers, crud, schemas)
+        |   |   |       \---weather         # Weather API tool
+        |   |   |
+        |   |   +---api                     # REST API schemas & routes
+        |   |   +---agent                   # Local client + agent_tool
+        |   |
+        |   +---base                        # Base classes (BaseTool, LLMBase, VectorStoreBase)
+        |   +---config                      # Settings, DB, logger, Celery, vector store
+        |   +---enum                        # Tool + CSV status enums
+        |   +---helpers                     # Utils (pg lock, singleton, file ops, etc.)
+        |   +---services                    # External services (Chroma, embeddings, Celery worker)
+        |   +---tests                       # Unit tests
+        |
+        +---static                          # Example CSVs + City index JSON
+
+```
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```text
