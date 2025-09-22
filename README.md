@@ -126,17 +126,18 @@ Row IDs fetched from Postgres → reconstructed + returned.
 Response streamed to agent via SSE.
 
 
-| Layer              | Technology                       | Reasoning                       |
-| ------------------ | -------------------------------- | ------------------------------- |
-| **Protocol Layer** | FastMCP                          | MCP-native server, SSE support  |
-| **App Server**     | FastAPI + Uvicorn                | Production-ready async HTTP     |
-| **Orchestration**  | Celery + Redis                   | Async ingestion & embeddings    |
-| **Database**       | PostgreSQL                       | Metadata & ingestion status     |
-| **Vector Store**   | ChromaDB                         | Fast semantic similarity search |
-| **LLM**            | Qwen2.5 (via Ollama)             | Local inference, multilingual   |
-| **Embeddings**     | HuggingFace E5                   | Multilingual dense vectors      |
-| **Infra**          | Docker Compose                   | Portable deployment             |
-| **Observability**  | Logging, retries, safe ingestion | Production resiliency           |
+| Layer                         | Technology                       | Reasoning                           |
+| ----------------------------- | -------------------------------- | ----------------------------------- | 
+| **Protocol Layer**            | FastMCP                          | MCP-native server, SSE support      |
+| **App Server**                | FastAPI + Uvicorn                | Production-ready async HTTP         |
+| **Orchestration**             | Celery + Redis                   | Async ingestion & embeddings        |
+| **Database**                  | PostgreSQL                       | Metadata & ingestion status         |
+| **Vector Store**              | ChromaDB                         | Fast semantic similarity search     |
+| **LLM**                       | Qwen2.5 (via Ollama)             | Local inference, multilingual       |
+| **Embeddings**                | HuggingFace E5                   | Multilingual dense vectors          |
+| **Infra**                     | Docker Compose                   | Portable deployment                 |
+| **Observability**             | Logging, retries, safe ingestion | Production resiliency               |
+|**LangGraph & LangChain**      | Communication agent MCP server   | Testing MCP server & wrap embedding | 
 
 ## Getting Started
 1️⃣ Clone & configure
