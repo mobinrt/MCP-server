@@ -71,51 +71,16 @@ class Registry(metaclass=SingletonMeta):
             )
 
         method = getattr(instance, method_name)
-        params = _method_param_info(method)
-
-        """
-        Decide wrapper behavior:
-        # - no params -> call method()
-        # - single param named 'args' or annotated as dict -> call method(args)
-        # - otherwise -> call method(**args) (expecting keys in args to match param names)
-        """
-        # single_args_param = len(params) == 1 and (
-        #     params[0].name == "args"
-        #     or (params[0].annotation is dict)
-        #     or (params[0].annotation == Dict)
-        # )
-
-        # no_params = len(params) == 0
 
         if inspect.iscoroutinefunction(method):
-            
+
             async def wrapper(args: dict):
                 return await method(args)
-            # elif single_args_param:
 
-            #     async def wrapper(args: dict):
-            #         return await method(args)
-            # else:
-            #     # expects named params -> forward as kwargs
-            #     async def wrapper(args: dict):
-            #         if not isinstance(args, dict):
-            #             raise TypeError("Tool arguments must be an object/dict.")
-            #         return await method(**args)
         else:
-            # if no_params:
 
-            #     def wrapper():
-            #         return method()
-            # elif single_args_param:
-
-                def wrapper(args: dict):
-                    return method(args)
-            # else:
-
-            #     def wrapper(args: dict):
-            #         if not isinstance(args, dict):
-            #             raise TypeError("Tool arguments must be an object/dict.")
-            #         return method(**args)
+            def wrapper(args: dict):
+                return method(args)
 
         """
         tool_name = name or f"{instance.__class__.__name__}.{method_name}
@@ -123,7 +88,9 @@ class Registry(metaclass=SingletonMeta):
         """
         tool_name = name or f"{instance.__class__.__name__}"
         tool_description = f"{instance.description}"
-        decorated = self.mcp.tool(name=tool_name, **tool_kwargs, description=tool_description)(wrapper)
+        decorated = self.mcp.tool(
+            name=tool_name, **tool_kwargs, description=tool_description
+        )(wrapper)
         self.tools[tool_name] = decorated
         return decorated
 
