@@ -59,8 +59,7 @@ Postgres: Guarantees persistence and transactional safety for metadata.
 
 Chroma: Stores normalized embeddings for semantic search.
 
-## Features in Depth
-#🧩 Tools
+## Features in Depth(Tools)
 csv_rag – Ingests a folder of CSVs into Postgres + Chroma. Runs RAG pipeline over Chroma embeddings with Postgres metadata lookup.
 
 weather.get – Example tool for city-based weather (JSON data).
@@ -145,19 +144,7 @@ Dockerized stack allows scaling each component independently.
 
 Observability: logs and retries make debugging production-ready.
 
-## Roadmap
-
- Support hybrid search (vector + keyword filters).
-
- Add JSON/Parquet ingestion.
-
- Integrate LangGraph for agent-level orchestration.
-
- Add Prometheus + Grafana monitoring.
-
- Horizontal scaling with Kubernetes.
-
-#👩‍💻 Developer Guide
+## 👩‍💻 Developer Guide
 
 See DEVELOPMENT.md for:
 
