@@ -40,12 +40,12 @@ class InProcessAdapter(AdapterBase):
     def ready(self) -> bool:
         return bool(self._ready)
 
-    async def run(self, **kwargs) -> Any:
+    async def run(self, args: dict) -> Any:
         fn = getattr(self._impl, "run", None)
         if not fn:
             raise RuntimeError(f"Underlying impl for {self.name} has no run()")
         if inspect.iscoroutinefunction(fn):
-            return await fn(**kwargs)
+            return await fn(args)
         else:
             loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, fn, **kwargs)
+            return await loop.run_in_executor(None, fn, args)

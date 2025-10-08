@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     llm_model: str = os.getenv("LANGUAGE_MODEL", "qwen2.5:3b")
     llm_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
     mcp_mode: str = os.getenv("MCP_HTTP_MODE", "stream")
-    
-    #LOG
+
+    # LOG
     log_dir: str = os.getenv("LOG_DIR", "logs")
     log_file: str = os.path.join(log_dir, "app.log")
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     batch_size: int = int(os.getenv("BATCH_SIZE", "64"))
     embedding_batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "128"))
 
-    #Weather
+    # Weather
     weather_api_key: str = str(os.getenv("WEATHER_API_KEY"))
     weather_url: str = str(os.getenv("WEATHER_URL"))
     # chromadb
@@ -63,10 +63,14 @@ class Settings(BaseSettings):
     worker_max_retries: int = int(os.getenv("WORKER_MAX_RETRIES", "3"))
     celery_rate_limit: Optional[str] = os.getenv("CELERY_RATE_LIMIT", None)
 
-    # Adapter timeout
     tool_celery_timeout: int = int(os.getenv("TOOL_CELERY_TIMEOUT", "300"))
-
-
     
+    use_celery: bool = os.getenv("USE_CELERY", "False")
+
+    # Tools
+    tools_run_with_celery: list[str] = os.getenv(
+        "TOOLS_RUN_WITH_CELERY", "csv_rag"
+    ).split(",")
+
 
 settings = Settings()

@@ -1,33 +1,14 @@
 from typing import Any, Callable, Dict
 
 from src.config import db as config_db
-
 from src.app.tool.tools.csv_rag.rag import CsvRagTool
 from src.app.tool.tools.weather.weather import WeatherTool
 from src.config.vector_store import VectorStore
 from src.enum.tools import Tools
 from src.app.tool.registry import Registry
 from src.app.tool.tools.weather import cities_path
-from src.base.base_tool import BaseTool
-
-"""
-Saves startup cost, tools only load when needed
-First call to a tool will be slower.
-"""
-
-
-class LazyToolWrapper:
-    def __init__(self, factory) -> BaseTool:
-        self.factory = factory
-        self._instance: BaseTool = None
-
-    async def run(self):
-        if self._instance is None:
-            self._instance = self.factory()
-            if hasattr(self._instance, "initialize"):
-                await self._instance.initialize()
-        return self._instance
-
+from src.helpers.lazy_wrapper import LazyToolWrapper
+from src.app.tool.dispatcher import dispatch_tool
 
 """
 TOOL_FACTORIES: mapping tool_name -> factory() that returns a tool *implementation instance*
@@ -35,10 +16,6 @@ TOOL_FACTORIES: mapping tool_name -> factory() that returns a tool *implementati
 
 
 def _csv_factory() -> CsvRagTool:
-    """
-    Create and return a CsvRagTool instance.
-    """
-
     vs = VectorStore()
     return CsvRagTool(db=config_db, vector_store=vs)
 
@@ -54,25 +31,31 @@ TOOL_FACTORIES: Dict[str, Callable[[], Any]] = {
 
 
 async def init_tools(reg: Registry):
-    reg.register_instance_method(
-        await LazyToolWrapper(TOOL_FACTORIES[Tools.CSV_RAG.value]).run(),
-        method_name="run",
-        name="csv_rag",
-    )
+    csv_wrapper = LazyToolWrapper(_csv_factory, name=Tools.CSV_RAG.value)
+    reg.register_instance(csv_wrapper, name=Tools.CSV_RAG.value)
 
-    reg.register_instance_method(
-        await LazyToolWrapper(TOOL_FACTORIES[Tools.WEATHER.value]).run(),
-        method_name="run",
-        name="weather",
+    weather_wrapper = LazyToolWrapper(_weather_factory, name=Tools.WEATHER.value)
+    reg.register_instance(weather_wrapper, name=Tools.WEATHER.value)
+
+    @reg.mcp.tool(name=Tools.CSV_RAG.value, description="CSV RAG query")
+    async def csv_rag_entry(args: dict):
+        return await dispatch_tool(Tools.CSV_RAG.value, args or {})
+
+    @reg.mcp.tool(
+        name=f"{Tools.CSV_RAG.value}.ingest_folder", description="CSV RAG ingest folder"
     )
+    async def csv_rag_ingest_entry(args: dict):
+        return await dispatch_tool(Tools.CSV_RAG.value, args or {})
+
+    @reg.mcp.tool(name=Tools.WEATHER.value, description="Weather lookup")
+    async def weather_entry(args: dict):
+        print("payload: ", args)
+        return await dispatch_tool(Tools.WEATHER.value, args or {})
 
     @reg.mcp.tool(name=Tools.HEALTH.value, description="Basic health check")
     async def health_ping(args: dict):
         return {"status": "ok"}
 
-    await reg.initialize_instances(
-        [
-            TOOL_FACTORIES[Tools.CSV_RAG.value](),
-            TOOL_FACTORIES[Tools.WEATHER.value](),
-        ]
-    )
+    # Do not call factories here and do not await their instantiation.
+    # If you want to warm a tool at startup, call:
+    # await reg.initialize_instances([csv_wrapper, weather_wrapper])

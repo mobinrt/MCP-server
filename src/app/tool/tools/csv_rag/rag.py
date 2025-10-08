@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class CsvRagTool(BaseTool):
+    """
+    Tool for CSV Retrieval-Augmented Generation (RAG).
+    Handles ingestion of CSV files into a vector store and querying them via embeddings.
+    """
+
     def __init__(self, db: Database, vector_store: VectorStoreBase):
         self.db = db
         self.vs = vector_store
@@ -29,13 +34,12 @@ class CsvRagTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Searches ingested CSV data via embeddings and vector similarity."
+        return "Search ingested CSV data via embeddings and vector similarity."
 
     async def initialize(self):
         """
-        Acquire advisory lock to avoid duplicate ingestion race if desired by startup flow.
-        This does NOT auto-ingest; it only ensures readiness and optionally prevents
-        concurrent ingestion if you choose to call ingest_folder right away.
+        Initialization phase. Acquires an advisory lock to avoid duplicate ingestion
+        races on startup. Does not auto-ingest.
         """
         lock_key = 42
         async with self.db.SessionLocal() as session:
@@ -46,19 +50,22 @@ class CsvRagTool(BaseTool):
                     logger.info(
                         "CsvRagTool initialize: another process holds the lock; proceeding (ready)."
                     )
-                    self._ready = True
-                    return
-                logger.info(
-                    "CsvRagTool initialize: acquired lock (no auto-ingest performed)."
-                )
+                else:
+                    logger.info(
+                        "CsvRagTool initialize: acquired lock (no auto-ingest performed)."
+                    )
                 self._ready = True
 
     async def ingest_folder(self, folder_path: str, batch_size: int = 512):
         """
-        Scan folder and ingest new/changed CSVs.
-        It acquires an advisory lock for the lifetime of ingestion so multiple workers
-        don't ingest the same files concurrently.
+        Scan a folder and ingest new/changed CSVs into the vector store.
+        Protected by an advisory lock to avoid concurrent ingestion.
+        Heavy ingestion should be delegated to Celery (if used in production).
         """
+        if not self._ready:
+            logger.warning("CsvRagTool not initialized. Call initialize() first.")
+            return
+
         lock_key = 42
         async with self.db.SessionLocal() as session:
             async with advisory_lock(session, lock_key) as acquired:
@@ -67,31 +74,24 @@ class CsvRagTool(BaseTool):
                         "ingest_folder: another process holds lock, skipping ingestion."
                     )
                     return
+
                 file_paths = await self.file_mgr.scan_folder(folder_path)
                 for p in file_paths:
                     file_meta = await self.file_mgr.get_or_register_file(session, p)
 
-                    if file_meta.get("status") == FileStatus.DONE.value:
+                    status = file_meta.get("status")
+                    if status == FileStatus.DONE.value:
                         logger.info("Skipping already ingested file: %s", p)
                         continue
 
-                    if file_meta.get("status") in [
-                        FileStatus.PENDING.value,
-                        FileStatus.FAILED.value,
-                    ]:
+                    if status in [FileStatus.PENDING.value, FileStatus.FAILED.value]:
                         logger.info("Ingesting file: %s", p)
                         try:
-                            logger.info(
-                                "start to ingest rows: %s", p
-                            )
                             await self.ingest_mgr.ingest_rows(
                                 session,
                                 CSVLoader.stream_csv_async(p),
                                 batch_size=batch_size,
                                 file_meta=file_meta,
-                            )
-                            logger.info(
-                                "started to ingested and mark as done: %s", p
                             )
                             await self.file_mgr.mark_file_as_done(session, file_meta)
                             logger.info(
@@ -99,13 +99,24 @@ class CsvRagTool(BaseTool):
                             )
 
                         except Exception as e:
-                            logger.error(f"Ingestion failed for file {p}: {e}")
+                            logger.error("Ingestion failed for file %s: %s", p, e)
                             await self.file_mgr.mark_file_as_failed(session, file_meta)
                             await session.rollback()
                     else:
                         logger.info("Skipping unchanged file: %s", p)
 
     async def run(self, args: dict):
-        parsed = RagArgs(**args)
-        res = await self.query_mgr.search(parsed.query, parsed.top_k)
-        return {"result": res}
+        """
+        Run a search query against ingested CSV data.
+        """
+        if not self._ready:
+            logger.warning("CsvRagTool not initialized. Call initialize() first.")
+            return {"error": "Tool not initialized."}
+
+        try:
+            parsed = RagArgs(**args)
+            res = await self.query_mgr.search(parsed.query, parsed.top_k)
+            return {"result": res}
+        except Exception as e:
+            logger.exception("CsvRagTool run failed")
+            return {"error": str(e)}

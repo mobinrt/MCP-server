@@ -25,7 +25,7 @@ from src.config.logger import logging
 from src.config.settings import settings
 from src.config.celery import CELERY_CONFIG
 
-from src.app.tool.registry import registry
+import src.app.tool.registry as reg
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +228,7 @@ def _safe_call_sync_or_async(fn, *args, **kwargs):
 
 def _get_tool(tool_name: str):
     """Resolve tool from FastMCP registry."""
-    tool = registry.get(tool_name)
+    tool = reg.registry.get(tool_name)
     if not tool:
         raise ValueError(f"Unknown tool: {tool_name}")
     return tool

@@ -1,10 +1,10 @@
 import asyncio
 from typing import Any, Optional
-from celery import Celery
 
 from src.config.settings import settings
 from src.config.logger import logging
 from src.base.adapter_base import AdapterBase
+import src.services.worker as worker 
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,7 @@ class CeleryAdapter(AdapterBase):
         self._redis_url = redis_url or settings.redis_url
         self._timeout = int(settings.tool_celery_timeout)
         self._ready = True
-
-        self._celery = Celery(
-            "mcp_client", broker=self._redis_url, backend=self._redis_url
-        )
+        self._celery = worker.celery_app
 
     @property
     def name(self) -> str:
@@ -39,17 +36,16 @@ class CeleryAdapter(AdapterBase):
     def ready(self) -> bool:
         return bool(self._ready)
 
-    async def run(self, **kwargs) -> Any:
+    async def run(self, args: dict) -> Any:
         def _send_and_get():
             try:
                 async_result = self._celery.send_task(
-                    "run_tool_task", args=[self._name, kwargs]
+                    "run_tool_task", args=[self._name, args]
                 )
                 return async_result.get(timeout=self._timeout)
             except Exception as e:
                 logger.exception("Celery task for %s failed: %s", self._name, e)
                 raise RuntimeError(f"Celery task for {self._name} failed") from e
-
 
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _send_and_get)

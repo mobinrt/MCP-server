@@ -10,10 +10,12 @@ from langchain_ollama import OllamaLLM
 
 # logger = logging.getLogger(__name__)
 
+
 class AgentState(dict):
     query: str
     action: dict
     result: str
+
 
 ALLOWED_TOOLS = {
     "csv_rag",
@@ -32,7 +34,6 @@ def extract_json_object_from_text(text: str) -> Optional[dict]:
         return json.loads(text)
     except Exception:
         pass
-
 
     start = text.find("{")
     if start == -1:
@@ -54,9 +55,7 @@ def extract_json_object_from_text(text: str) -> Optional[dict]:
     return None
 
 
-
 llm = OllamaLLM(model="qwen2.5:3b", base_url="http://localhost:11434")
-
 
 
 async def llm_node(state: AgentState):
@@ -69,7 +68,7 @@ async def llm_node(state: AgentState):
     - weather(city: str)
     - health.ping()
 
-    User query: {state['query']}
+    User query: {state["query"]}
 
     Return JSON with exact arguments required by the tool.
     Examples:
@@ -81,7 +80,7 @@ async def llm_node(state: AgentState):
     Always ensure all required fields are present.
     """
     response = await llm.ainvoke(prompt)
-    print("res: ",response)
+    print("res: ", response)
     print(type(response))
     try:
         action = json.loads(response.strip())
@@ -89,8 +88,7 @@ async def llm_node(state: AgentState):
         action = {"tool": "health.ping", "args": {}}
 
     state["action"] = action
-    return state   
-
+    return state
 
 
 async def tool_node(state: AgentState):
@@ -103,15 +101,15 @@ async def tool_node(state: AgentState):
         tool = action["tool"]
         args = action.get("args", {})
 
-
         if not isinstance(args, dict):
             args = {}
-        mcp_args = {"args": args}
 
-        result = await client.call_tool(tool, mcp_args)
+        pass_args = {"args": args}
+        result = await client.call_tool(tool, pass_args)
         state["result"] = result.data
 
     return state
+
 
 # 4. Build LangGraph workflow
 def build_graph():
@@ -145,13 +143,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 
-
 # from fastmcp import Client as MCPClient
 # import asyncio
 
 # async def list_tools():
 #     async with MCPClient("http://127.0.0.1:8000/mcp") as client:
 #         tools = await client.list_tools()
-#         print("Registered tools:", tools)        
+#         print("Registered tools:", tools)
 
 # asyncio.run(list_tools())

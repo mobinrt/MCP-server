@@ -1,6 +1,5 @@
 import json
 import aiohttp
-from typing import Dict, Any
 from rapidfuzz import process, fuzz
 from pathlib import Path
 
@@ -72,7 +71,6 @@ class WeatherTool(BaseTool):
             if not city_info:
                 return {"error": f"City '{city}' not found in index."}
 
-            # Build request params
             params = {
                 "q": f"{city_info['name']},ir",
                 "APPID": self.api_key,
