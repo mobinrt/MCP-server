@@ -1,9 +1,9 @@
 from src.base.models import BaseModel
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, Text, JSON, ForeignKey
+from sqlalchemy import Integer, String, Text, JSON, ForeignKey, Boolean
 from typing import Optional
 from src.enum.csv_status import EmbeddingStatus, FileStatus
-
+from src.enum.executor import Executor
 
 class CSVRow(BaseModel):
     __tablename__ = "csv_rows"
@@ -68,3 +68,15 @@ class CSVFile(BaseModel):
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
+
+class ToolRegistry(BaseModel):
+    __tablename__ = "tool_registry"
+
+    name: Mapped[str] = mapped_column(String, unique=True, index=True)  
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    type: Mapped[str] = mapped_column(String, nullable=False, default="csv_rag")
+    adapter: Mapped[str] = mapped_column(String, nullable=False, default=Executor.IN_PROCESS.value) 
+    file_id: Mapped[int] = mapped_column(ForeignKey("csv_files.id", ondelete="CASCADE"))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    file = relationship("CSVFile", backref="tool_entry")

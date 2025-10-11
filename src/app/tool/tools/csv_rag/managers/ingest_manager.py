@@ -16,6 +16,7 @@ from src.services.embedding import embed_texts_async, prepare_text_for_embedding
 from src.services.chromadb import vs_add_and_persist_async
 from src.helpers.row_util import row_checksum
 from src.app.tool.tools.csv_rag.schemas import IncomingRow, PreparedRow, FileMeta
+from src.app.tool.tools.csv_rag.managers.tool_registry import ToolRegistryManager
 
 logger = logging.getLogger(__name__)
 
@@ -365,7 +366,5 @@ class CSVIngestManager:
             except Exception as e:
                 logger.exception("Failed to mark rows done for file_id=%s: %s", file_id, e)
 
-            # 9) Update progress
             await self.repo.update_last_row_index(session, file_id, current_row_counter)
-
         logger.info("Completed ingest_rows for file_id=%s", file_meta.get("id"))

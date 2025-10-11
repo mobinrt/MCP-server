@@ -55,20 +55,17 @@ class Registry(metaclass=SingletonMeta):
         **tool_kwargs,
     ) -> Callable:
         """Register a plain function as an MCP tool (with adapter + lazy wrapper)."""
-        # For plain functions, we create an adapter instance and a Lazy wrapper around it.
         adapter_inst = self._select_adapter(func, adapter)
         wrapper = LazyToolWrapper(lambda: adapter_inst, name=name or func.__name__)
 
         tool_name = name or getattr(func, "__name__", None)
 
-        # MCP entry point: call wrapper.run(payload) (wrapper is the *instance* used by workers)
         async def _tool_entry(args: dict):
-            # args is the incoming MCP arguments dict (likely {"args": {...}})
             return await wrapper.run(args or {})
 
         decorated = self.mcp.tool(name=tool_name, **tool_kwargs)(_tool_entry)
         self.tools[tool_name] = decorated
-        # store the instance/via which workers can run in-process
+        
         self.instances[tool_name] = wrapper
         return decorated
 
@@ -92,7 +89,6 @@ class Registry(metaclass=SingletonMeta):
 
         tool_name = name or getattr(instance, "name", instance.__class__.__name__)
 
-        # Create MCP entry that will call dispatch_tool or route to the instance.
         async def _tool_entry(args: dict):
             """ When invoked via MCP, we expect args as {"args": {...}} or a simple dict
                 The instance itself can decide how to handle the payload.
@@ -107,7 +103,6 @@ class Registry(metaclass=SingletonMeta):
             **tool_kwargs,
         )(_tool_entry)
 
-        # Save both the decorated callable (for MCP listing) and the instance (for dispatch)
         self.tools[tool_name] = decorated
         self.instances[tool_name] = instance
         return decorated

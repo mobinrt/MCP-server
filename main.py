@@ -3,7 +3,7 @@ import anyio
 import uvicorn
 
 from src.config.logger import logging
-
+from src.config import db
 from src.app.tool.registry import registry
 from src.config.settings import settings
 from src.app.tool import init_tools
@@ -19,6 +19,7 @@ async def async_init():
     """Initialize tools before starting server."""
 
     logger.info("Initializing tools...")
+    await db.init_db()
     await init_tools(registry)
     logger.info("Tools initialized successfully.")
 

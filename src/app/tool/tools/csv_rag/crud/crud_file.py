@@ -18,6 +18,11 @@ async def get_csv_file(session: AsyncSession, path: str) -> Optional[Dict[str, A
     obj = res.scalar_one_or_none()
     return model_to_dict(obj) if obj else None
 
+async def get_csv_file_by_id(session: AsyncSession, id: int) -> Optional[Dict[str, Any]]:
+    stmt = select(CSVFile).where(CSVFile.id == id)
+    res = await session.execute(stmt)
+    obj = res.scalar_one_or_none()
+    return model_to_dict(obj) if obj else None
 
 async def create_csv_file(
     session: AsyncSession,

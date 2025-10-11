@@ -42,7 +42,6 @@ class CSVQueryManager:
 
         # 1) Preferred: async retriever that returns Documents
         if self.retriever is not None:
-            # support async retriever if available
             aget = getattr(self.retriever, "aget_relevant_documents", None)
             if callable(aget):
                 try:
@@ -51,7 +50,6 @@ class CSVQueryManager:
                     logger.exception("Async retriever failed: %s", e)
                     docs = []
             else:
-                # fallback to sync call in thread
                 get_docs = getattr(self.retriever, "get_relevant_documents", None)
                 if callable(get_docs):
                     loop = asyncio.get_running_loop()
