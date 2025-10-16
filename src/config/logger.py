@@ -92,3 +92,12 @@ def setup_logging():
 
 
 setup_logging()
+
+
+def get_logger():
+    import inspect
+
+    frame = inspect.stack()[1]
+    module = inspect.getmodule(frame[0])
+    name = module.__name__ if module else "__main__"
+    return logging.getLogger(name)

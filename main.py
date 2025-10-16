@@ -6,7 +6,8 @@ from src.config.logger import logging
 from src.config import db
 from src.app.tool.registry import registry
 from src.config.settings import settings
-from src.app.tool import init_tools
+from src.app.tool.init_tools import init_tools
+from src.config.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,10 @@ app = registry.http_app()
 
 async def async_init():
     """Initialize tools before starting server."""
-
+    vs = VectorStore()
     logger.info("Initializing tools...")
     await db.init_db()
-    await init_tools(registry)
+    await init_tools(registry, vs)
     logger.info("Tools initialized successfully.")
 
 

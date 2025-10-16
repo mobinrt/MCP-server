@@ -2,17 +2,17 @@ from typing import Dict, Any, List, Iterable, AsyncIterable, Union, Tuple, Seque
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.tool.tools.csv_rag.models import CSVFile, CSVRow
+from src.app.tool.tools.rag.models import CSVFile, CSVRow
 from src.config.logger import logging
 from src.enum.csv_status import EmbeddingStatus
-from src.app.tool.tools.csv_rag.crud.crud_row import bulk_upsert_rows
+from src.app.tool.tools.rag.crud.crud_row import bulk_upsert_rows
 from src.services.embedding import (
     embed_texts_async,
     prepare_text_for_embedding,
 )
 from src.services.chromadb import vs_add_and_persist_async
 from src.helpers.row_util import row_checksum
-from src.app.tool.tools.csv_rag.schemas import IncomingRow, PreparedRow, FileMeta
+from src.app.tool.tools.rag.schemas import IncomingRow, PreparedRow, FileMeta
 
 
 logger = logging.getLogger(__name__)

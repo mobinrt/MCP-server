@@ -28,10 +28,10 @@ class Registry(metaclass=SingletonMeta):
     ):
         self.mcp = FastMCP(name=name)
         self.tools: Dict[str, Callable] = {}
-        self.instances: Dict[str, Any] = {}
+        self.instances: Dict[str, BaseTool] = {}
         self.default_adapter = default_adapter
 
-    def get(self, name: str) -> Optional[Any]:
+    def get(self, name: str) -> Optional[BaseTool]:
         """
         Return the underlying instance for `name`, if available.
         Falls back to returning the registered MCP callable if no instance exists.
@@ -65,16 +65,16 @@ class Registry(metaclass=SingletonMeta):
 
         decorated = self.mcp.tool(name=tool_name, **tool_kwargs)(_tool_entry)
         self.tools[tool_name] = decorated
-        
+
         self.instances[tool_name] = wrapper
         return decorated
 
     def register_instance(
         self,
-        instance: Any,
+        instance: BaseTool,
         method_name: str = "run",
-        name: Optional[str] = None,
-        adapter: Optional[str] = None,
+        name: str | None = None,
+        adapter: str | None = None,
         **tool_kwargs,
     ):
         """
@@ -90,10 +90,10 @@ class Registry(metaclass=SingletonMeta):
         tool_name = name or getattr(instance, "name", instance.__class__.__name__)
 
         async def _tool_entry(args: dict):
-            """ When invoked via MCP, we expect args as {"args": {...}} or a simple dict
-                The instance itself can decide how to handle the payload.
-                We call instance.run(payload) so the instance (LazyToolWrapper) can
-                extract payload["args"] if needed.
+            """When invoked via MCP, we expect args as {"args": {...}} or a simple dict
+            The instance itself can decide how to handle the payload.
+            We call instance.run(payload) so the instance (LazyToolWrapper) can
+            extract payload["args"] if needed.
             """
             return await instance.run(args or {})
 

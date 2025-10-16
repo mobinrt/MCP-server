@@ -1,7 +1,7 @@
 import asyncio
 
 from src.config import db
-from src.app.tool.tools.csv_rag.rag import CsvRagTool
+from src.app.tool.tools.rag.rag import CsvRagTool
 from src.config.vector_store import VectorStore
 from src.config.logger import logging
 

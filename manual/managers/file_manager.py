@@ -12,7 +12,7 @@ from src.helpers.file_util import (
     normalized_path,
     count_total_rows,
 )
-from src.app.tool.tools.csv_rag.crud.crud_file import (
+from src.app.tool.tools.rag.crud.crud_file import (
     get_csv_file,
     create_csv_file,
     update_csv_file_checksum,

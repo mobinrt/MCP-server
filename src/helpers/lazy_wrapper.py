@@ -1,13 +1,13 @@
 import asyncio
 import inspect
-from typing import Any, Callable, Optional
-from src.base.base_tool import BaseTool
+from typing import Callable, Optional
+from src.base.adapter_base import AdapterBase, BaseTool
 from src.config.logger import logging
 
 logger = logging.getLogger(__name__)
 
 
-class LazyToolWrapper(BaseTool):
+class LazyToolWrapper(AdapterBase):
     """
     Lazily instantiate a tool via factory() on first use.
     Exposes async initialize(), run(args: dict) and ingest_folder(folder_path, **kwargs) if underlying instance has them.
@@ -15,12 +15,12 @@ class LazyToolWrapper(BaseTool):
     The factory is expected to return an instance whose API is async (async def initialize/run/etc).
     """
 
-    def __init__(self, factory: Callable[[], BaseTool], name: Optional[str] = None):
-        self.factory = factory
+    def __init__(self, factory: Callable[[], BaseTool], name: str, description: str | None = None):
+        self.factory = BaseTool
         self._instance: Optional[BaseTool] = None
         self._lock = asyncio.Lock()
         self._name = name or getattr(factory, "__name__", "lazy_tool")
-        self._description = ""
+        self._description = description
         self._ready = False
 
     async def _ensure_instance(self):
