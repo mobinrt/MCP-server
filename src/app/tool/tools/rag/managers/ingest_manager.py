@@ -17,6 +17,7 @@ from src.services.chromadb import vs_add_and_persist_async
 from src.helpers.row_util import row_checksum
 from src.app.tool.tools.rag.schemas import IncomingRow, PreparedRow, FileMeta
 from src.app.tool.tools.rag.managers.tool_registry import ToolRegistryManager
+from src.config import Database, db as global_db
 
 logger = logging.getLogger(__name__)
 
@@ -216,8 +217,8 @@ class CSVIngestManager:
       - keep CSVRow.vector_id set to "CSVRow:{row_id}" (parent) for backward compatibility
     """
 
-    def __init__(self, db, vector_store):
-        self.db = db
+    def __init__(self, vector_store):
+        self.db: Database = global_db
         self.vs = vector_store
         self.repo = RowRepository()
         self.vs_adapter = VectorStoreAdapter(self.vs)

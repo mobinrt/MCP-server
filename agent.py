@@ -65,6 +65,11 @@ DO NOT choose any maintenance or ingestion tools.
 Available tools:
 {tool_lines}
 
+tools schema:
+- csv_rag:all_subtools(query: str, top_k: int)
+- weather(city: str)
+- health.ping()
+
 User query:
 \"{query}\"
 
@@ -73,7 +78,9 @@ Return EXACTLY one JSON object, nothing else, with format:
 
 Example:
 {{ "tool": "weather", "args": {{ "city": "Tehran" }} }}
+{{ "tool": "csv_rag:STH", "args": {{ "query": "what use ask in optimize", top_k: "int * 3"}} }}
 
+keep this schema for weather and csv_rag:...
 If unsure, choose the best matching tool by name and description.
 """
 
@@ -121,7 +128,7 @@ async def llm_node(state: AgentState):
     # 3) parse JSON; robust fallback
     action = extract_json_object_from_text(response)
     if not action:
-        print("⚠️ LLM returned invalid JSON. Response:", response)
+        print("⚠️ LLM returned invalid JSON. Response:", response, "action: ", action)
         action = {"tool": "health.ping", "args": {}}
 
     # 4) validate selected tool exists and is public

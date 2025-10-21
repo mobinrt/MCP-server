@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Dict
 
 
-from src.config import Database
+from src.config import Database, db as global_db
 from src.config.logger import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.enum.csv_status import FileStatus
@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class CSVFileManager:
-    def __init__(self, db: Database):
-        self.db = db
+    def __init__(self):
+        self.db: Database = global_db
 
     async def compute_file_checksum(self, file_path: str) -> str:
         norm_path = normalized_path(file_path)

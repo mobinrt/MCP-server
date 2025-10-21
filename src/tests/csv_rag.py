@@ -13,7 +13,7 @@ async def main():
     vs = VectorStore().get()
     await db.init_db()
     # --- 2. Init CsvRagTool
-    tool = CsvRagTool(db, vs)
+    tool = CsvRagTool(vs)
     await tool.initialize()
 
     # --- 3. Ingest folder

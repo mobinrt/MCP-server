@@ -11,7 +11,7 @@ from src.app.tool.tools.rag.managers.ingest_manager import CSVIngestManager
 from src.app.tool.tools.rag.managers.query_manager import CSVQueryManager
 from src.app.tool.tools.rag.managers.tool_registry import ToolRegistryManager
 from src.app.tool.tools.rag.loader import CSVLoader
-from src.config.db import Database
+from src.config import db as global_db, Database
 from src.base.vector_store import VectorStoreBase
 from src.enum.csv_status import FileStatus
 from .schemas import RagArgs
@@ -27,16 +27,15 @@ class CsvRagTool(BaseTool):
 
     def __init__(
         self,
-        db: Database,
         vector_store: VectorStoreBase,
         name: str,
     ):
-        self.db = db
+        self.db: Database = global_db
         self.vs = vector_store
-        self.file_mgr: CSVFileManager = CSVFileManager(db)
-        self.ingest_mgr: CSVIngestManager = CSVIngestManager(db, vector_store)
-        self.query_mgr: CSVQueryManager = CSVQueryManager(db, vector_store)
-        self.registry_mgr: ToolRegistryManager = ToolRegistryManager(db)
+        self.file_mgr: CSVFileManager = CSVFileManager()
+        self.ingest_mgr: CSVIngestManager = CSVIngestManager(vector_store)
+        self.query_mgr: CSVQueryManager = CSVQueryManager(vector_store)
+        self.registry_mgr: ToolRegistryManager = ToolRegistryManager()
         self._ready = False
         self._description = "General RAG"
         self._name = name
@@ -63,7 +62,8 @@ class CsvRagTool(BaseTool):
         Now integrates ToolRegistry validation.
         Still acquires an advisory lock to avoid duplicate ingestion races.
         """
-        async with self.db.SessionLocal() as session:
+
+        async with self.db.session() as session:
             valid, tool_or_msg = await self.registry_mgr.validate_and_prepare_tool(
                 session, self.name
             )
@@ -79,24 +79,34 @@ class CsvRagTool(BaseTool):
                 )
                 valid = True
 
-            tool = tool_or_msg
-            lock_key = 1000
+        tool = tool_or_msg
+        # async with self.db.session() as session:
+        #     tool = self.registry_mgr.get_tool(session, self.name)
+        #     if not tool:
+        #         tool = await self.registry_mgr.create_tool(
+        #             session,
+        #             name=self.name,
+        #             description="Global CSV RAG root tool",
+        #             file_id=None,
+        #         )
 
-            async with advisory_lock(
-                session, lock_key, wait=False, retries=5, delay=0.1
-            ) as acquired:
-                if not acquired:
-                    logger.info(
-                        f"CsvRagTool initialize: another process holds the lock (tool={tool.name}). Proceeding (ready)."
-                    )
-                else:
-                    await self.registry_mgr.initialize_tool(
-                        session, tool.name, tool.file_id
-                    )
-                    logger.info(
-                        f"CsvRagTool initialize: acquired lock and validated tool '{tool.name}'."
-                    )
-                self._ready = True
+        # lock_key = 1000
+        # async with self.db.session() as session:
+        #     async with advisory_lock(
+        #         session, lock_key, wait=False, retries=5, delay=0.1
+        #     ) as acquired:
+        #         if not acquired:
+        #             logger.info(
+        #                 f"CsvRagTool initialize: another process holds the lock (tool={tool.name}). Proceeding (ready)."
+        #             )
+                # else:
+        await self.registry_mgr.initialize_tool(
+            session, tool.name, tool.file_id
+        )
+        logger.info(
+            f"CsvRagTool initialize: acquired lock and validated tool '{tool.name}'."
+        )
+        self._ready = True
 
     async def ingest_folder(self, folder_path: str, batch_size: int = 512):
         """
@@ -108,52 +118,62 @@ class CsvRagTool(BaseTool):
             logger.warning("CsvRagTool not initialized. Call initialize() first.")
             return
 
-        lock_key = 42
-        async with self.db.SessionLocal() as session:
-            async with advisory_lock(session, lock_key) as acquired:
-                if not acquired:
-                    logger.info(
-                        "ingest_folder: another process holds lock, skipping ingestion."
-                    )
-                    return
+        # lock_key = 42
+        # async with self.db.session() as session:
+        #     async with advisory_lock(session, lock_key) as acquired:
+        #         if not acquired:
+        #             logger.info(
+        #                 "ingest_folder: another process holds lock, skipping ingestion."
+        #             )
+        #             return
 
-                file_paths = await self.file_mgr.scan_folder(folder_path)
-                for p in file_paths:
-                    file_meta = await self.file_mgr.get_or_register_file(session, p)
+        file_paths = await self.file_mgr.scan_folder(folder_path)
+        for p in file_paths:
+            async with self.db.session() as session_db:
+                file_meta = await self.file_mgr.get_or_register_file(
+                    session_db, p
+                )
 
-                    status = file_meta.get("status")
-                    if status == FileStatus.DONE.value:
-                        logger.info("Skipping already ingested file: %s", p)
-                        continue
+                status = file_meta.get("status")
+                if status == FileStatus.DONE.value:
+                    logger.info("Skipping already ingested file: %s", p)
+                    continue
 
-                    file_stem = Path(file_meta["path"]).stem
-                    subtool_name = f"{self.name}:{file_stem}"
+                file_stem = Path(file_meta["path"]).stem
+                subtool_name = f"{self.name}:{file_stem}"
 
-                    if status in [FileStatus.PENDING.value, FileStatus.FAILED.value]:
-                        logger.info(f"Skipping already ingested file: {p}")
-                        try:
-                            await self.ingest_mgr.ingest_rows(
-                                session,
-                                CSVLoader.stream_csv_async(p),
-                                batch_size=batch_size,
-                                file_meta=file_meta,
-                            )
-                            await self.file_mgr.mark_file_as_done(session, file_meta)
+                if status in [
+                    FileStatus.PENDING.value,
+                    FileStatus.FAILED.value,
+                ]:
+                    logger.info(f"Processing pending or failed file {p}")
+                    try:
+                        await self.ingest_mgr.ingest_rows(
+                            session_db,
+                            CSVLoader.stream_csv_async(p),
+                            batch_size=batch_size,
+                            file_meta=file_meta,
+                        )
+                        await self.file_mgr.mark_file_as_done(
+                            session_db, file_meta
+                        )
 
-                            await self.registry_mgr.create_tool(
-                                session,
-                                name=f"{self.name}:{Path(file_meta.get('path')).stem}",
-                                file_id=file_meta.get("id"),
-                            )
+                        await self.registry_mgr.create_tool(
+                            session_db,
+                            name=f"{self.name}:{Path(file_meta.get('path')).stem}",
+                            file_id=file_meta.get("id"),
+                        )
 
-                            logger.info(f"Registered new subtool: {subtool_name}")
+                        logger.info(f"Registered new subtool: {subtool_name}")
 
-                        except Exception as e:
-                            await self.file_mgr.mark_file_as_failed(session, file_meta)
-                            logger.error("Ingestion failed for file %s: %s", p, e)
-                            await session.rollback()
-                    else:
-                        logger.info("Skipping unchanged file: %s", p)
+                    except Exception as e:
+                        await self.file_mgr.mark_file_as_failed(
+                            session_db, file_meta
+                        )
+                        logger.error("Ingestion failed for file %s: %s", p, e)
+                        await session_db.rollback()
+                else:
+                    logger.info("Skipping unchanged file: %s", p)
 
     async def run(self, args: dict):
         """
@@ -172,12 +192,27 @@ class CsvRagTool(BaseTool):
             return {"error": str(e)}
 
     async def set_metadata_from_json(self) -> None:
-        async with aiofiles.open("static/csv/csv_description.json", "r", encoding="utf_8") as f:
-            content = await f.read()
-            meta_map: dict = json.loads(content)
-            
-        base_name = self.name.split(":")[1] if ":" in self.name else self.name
+        try:
+            async with aiofiles.open(
+                "static/csv/csv_description.json", "r", encoding="utf_8"
+            ) as f:
+                content = await f.read()
+                meta_map: dict = json.loads(content)
+        except FileNotFoundError:
+            logger.warning("csv_description.json not found. Skipping metadata update.")
+            return
+
+        base_name = self.name.split(":")[1] if ":" in self.name else None
+
+        if base_name is None:
+            logger.warning(
+                f"Tool {self.name} is a parent tool, skipping metadata update."
+            )
+            return
+
         meta: dict = meta_map.get(base_name)
         if not meta:
-            logger.exception("No record in json for this tool")
+            logger.warning(f"No metadata record in json for tool: {base_name}")
+            return
+
         self.description = f"{meta.get('description')}, categories of records are: {meta.get('category')}"

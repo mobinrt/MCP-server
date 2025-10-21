@@ -6,11 +6,11 @@ from typing import List, Dict, Any, Optional
 import asyncio
 from langchain.schema import Document
 
-from src.config import Database
 from src.config.logger import logging
 from src.base.vector_store import VectorStoreBase
 from src.app.tool.tools.rag.crud.crud_row import select_rows_by_vector_ids
 from src.services.embedding import embed_texts_async
+from src.config import Database, db as global_db
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +20,9 @@ class CSVQueryManager:
     Use vectorstore retriever when available. Keeps DB fetch path as fallback if needed.
     """
 
-    def __init__(self, db: Database, vector_store: VectorStoreBase):
-        self.db = db
+    def __init__(self, vector_store: VectorStoreBase):
+        self.db: Database = global_db
         self.vs = vector_store
-        # try to obtain a retriever adapter if vs supports it
         try:
             self.retriever = getattr(self.vs, "as_retriever")(search_kwargs={"k": 5})
         except Exception:
@@ -94,7 +93,7 @@ class CSVQueryManager:
                     seen.add(p)
                     unique_parent_ids.append(p)
 
-            async with self.db.SessionLocal() as session:
+            async with self.db.session() as session:
                 rows = await select_rows_by_vector_ids(session, unique_parent_ids)
 
             id_to_row = {r.get("vector_id"): r for r in rows}

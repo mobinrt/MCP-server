@@ -1,6 +1,6 @@
 import asyncio
 import inspect
-from typing import Callable, Optional
+from typing import Callable
 from src.base.adapter_base import AdapterBase, BaseTool
 from src.config.logger import logging
 
@@ -10,37 +10,48 @@ logger = logging.getLogger(__name__)
 class LazyToolWrapper(AdapterBase):
     """
     Lazily instantiate a tool via factory() on first use.
-    Exposes async initialize(), run(args: dict) and ingest_folder(folder_path, **kwargs) if underlying instance has them.
-
-    The factory is expected to return an instance whose API is async (async def initialize/run/etc).
+    Thread- and async-safe, ensures initialize() only runs once.
     """
 
-    def __init__(self, factory: Callable[[], BaseTool], name: str, description: str | None = None):
-        self.factory = BaseTool
-        self._instance: Optional[BaseTool] = None
+    def __init__(
+        self, factory: Callable[[], BaseTool], name: str, description: str | None = None
+    ):
+        self.factory = factory
+        self._instance: BaseTool | None = None
         self._lock = asyncio.Lock()
         self._name = name or getattr(factory, "__name__", "lazy_tool")
         self._description = description
         self._ready = False
 
     async def _ensure_instance(self):
-        if self._instance is None:
-            async with self._lock:
-                if self._instance is None:
-                    logger.info("LazyToolWrapper: creating instance for %s", self._name)
-                    inst = self.factory()
-                    try:
-                        self._description = getattr(inst, "description", "") or ""
-                    except Exception:
-                        self._description = ""
+        if self._ready:
+            return
 
-                    init = getattr(inst, "initialize", None)
-                    if callable(init):
-                        ret = init()
-                        if inspect.isawaitable(ret):
-                            await ret
-                    self._instance = inst
-                    self._ready = True
+        async with self._lock:
+            if self._ready:
+                return
+
+            logger.info("LazyToolWrapper: creating instance for %s", self._name)
+            inst = self.factory()
+
+            try:
+                self._description = getattr(inst, "description", "") or ""
+            except Exception:
+                self._description = ""
+
+            init = getattr(inst, "initialize", None)
+            if callable(init):
+                ret = init()
+                if inspect.isawaitable(ret):
+                    try:
+                        await ret
+                    except Exception as e:
+                        logger.exception(f"Initialization failed for {self._name}: {e}")
+                        raise
+
+            self._instance = inst
+            self._ready = True
+            logger.info("LazyToolWrapper: instance ready for %s", self._name)
 
     @property
     def name(self) -> str:
@@ -63,6 +74,9 @@ class LazyToolWrapper(AdapterBase):
 
     async def run(self, payload: dict):
         await self._ensure_instance()
+        if not self._ready or not self._instance:
+            raise RuntimeError(f"Tool {self._name} not ready after initialization")
+
         method = getattr(self._instance, "run", None)
         if not method:
             raise RuntimeError(f"Underlying instance for {self._name} has no run()")
@@ -72,11 +86,15 @@ class LazyToolWrapper(AdapterBase):
 
     async def ingest_folder(self, folder_path: str, **kwargs):
         await self._ensure_instance()
+        if not self._ready or not self._instance:
+            raise RuntimeError(f"Tool {self._name} not ready after initialization")
+
         method = getattr(self._instance, "ingest_folder", None)
         if not method:
             raise RuntimeError(
                 f"Underlying instance for {self._name} has no ingest_folder()"
             )
+
         sig = inspect.signature(method)
         params = [p for p in sig.parameters.values() if p.name != "self"]
         if params and params[0].kind in (

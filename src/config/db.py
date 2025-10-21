@@ -19,7 +19,11 @@ class Database(metaclass=SingletonMeta):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    async def get_session(self) -> AsyncSession:
+    def session(self) -> AsyncSession:
+        return self.SessionLocal()
+
+    async def get_session_dependency(self) -> AsyncSession:
         async with self.SessionLocal() as session:
             yield session
+
 

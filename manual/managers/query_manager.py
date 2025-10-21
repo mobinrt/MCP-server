@@ -31,7 +31,7 @@ class CSVQueryManager:
         scores = res["distances"][0] if "distances" in res else [None] * len(vector_ids)
 
         # 4) fetch rows by ids from DB
-        async with self.db.SessionLocal() as session:
+        async with self.db.session() as session:
             rows = await select_rows_by_vector_ids(session, vector_ids)
 
         # 5) order results according to VS order

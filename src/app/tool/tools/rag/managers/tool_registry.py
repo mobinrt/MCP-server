@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict, List
 import logging
 
-from src.config.db import Database
+from src.config import Database, db as global_db
 
 from src.app.tool.tools.rag.crud.crud_tool import (
     get_all_tools,
@@ -24,10 +24,9 @@ class ToolRegistryManager:
     Exposes CRUD + a couple convenience helpers used by higher-level code.
     """
 
-    def __init__(self, db: Database):
-        self.db = db
+    def __init__(self):
+        self.db: Database = global_db
 
-   
     async def list_of_enabled_tools(self, session) -> List[ToolRegistry.to_dict]:
         """Return list of registry entries."""
         return await get_all_tools(session)
@@ -44,10 +43,10 @@ class ToolRegistryManager:
         adapter: str = Executor.CELERY.value,
         enabled: bool = True,
         description: str | None = None,
-        type: str = "csv_rag"
+        type: str = "csv_rag",
     ) -> Dict[str, Any]:
         """Create a tool registry entry."""
-        
+
         return await create_tool_registry(
             session=session,
             name=name,
@@ -55,10 +54,12 @@ class ToolRegistryManager:
             enabled=enabled,
             description=description,
             type=type,
-            file_id=file_id
+            file_id=file_id,
         )
 
-    async def set_enable_status(self, session, name: str, enabled: bool) -> Dict[str, Any]:
+    async def set_enable_status(
+        self, session, name: str, enabled: bool
+    ) -> Dict[str, Any]:
         """Enable/disable a registry entry."""
         return await set_tool_enable_status(session=session, name=name, enabled=enabled)
 
@@ -70,7 +71,6 @@ class ToolRegistryManager:
         """Delete a registry entry."""
         return await delete_tool_registry(session=session, name=name)
 
-   
     async def validate_and_prepare_tool(self, session, tool_name: str):
         """
         Ensure a registry entry exists for tool_name. Returns (True, tool_dict) on success.
@@ -81,10 +81,17 @@ class ToolRegistryManager:
         if tool:
             return True, tool
 
-        logger.exception("Tool %s not found. It will be created after ingestion.", tool_name)
-        return False, f"Tool '{tool_name}' not found. It will be created after ingestion."
+        logger.exception(
+            "Tool %s not found. It will be created after ingestion.", tool_name
+        )
+        return (
+            False,
+            f"Tool '{tool_name}' not found. It will be created after ingestion.",
+        )
 
-    async def initialize_tool(self, session, tool_name: str, file_id: Optional[int] = None) -> Dict[str, Any]:
+    async def initialize_tool(
+        self, session, tool_name: str, file_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Optional helper for initialization tasks that may need file metadata.
         Returns a dict with at least the tool entry; if file_id provided and found,

@@ -1,4 +1,7 @@
-from src.config import db as config_db
+from functools import partial
+
+from src.base import vector_store
+from src.config import db
 from src.app.tool.tools.rag.rag import CsvRagTool
 from src.app.tool.tools.weather.weather import WeatherTool
 from src.config.vector_store import VectorStore
@@ -33,43 +36,47 @@ async def init_tools(reg: Registry, vs: VectorStore):
     )
     reg.register_instance(weather_wrapper, name=Tools.WEATHER.value)
 
-    async with config_db.SessionLocal() as session:
-        reg_mgr = ToolRegistryManager(config_db)
+    reg_mgr = ToolRegistryManager()
+
+    async with db.session() as session:
         all_rags_tools = await reg_mgr.list_of_enabled_tools(session)
-        for tool in all_rags_tools:
-            try:
-                tool_name = str(tool.get("name"))
-                tool_type = str(tool.get("type"))
-                logger.info("show me the fucking tool %s", tool_name)
-                if tool_type == Tools.CSV_RAG.value:
-                    logger.info("fucking %s", tool_name)
-                    instance = CsvRagTool(config_db, vs, name=tool_name)
-                    await instance.set_metadata_from_json()
-                    logger.info(f"add description {instance.description}")
-                    wrapper = LazyToolWrapper(
-                        lambda: instance,
-                        name=tool_name,
-                    )
-                    reg.register_instance(wrapper, name=tool_name)
 
-                    @reg.mcp.tool(
-                        name=f"{tool_name}.ingest_folder",
-                        description=f"Ingest folder for {tool_name}, description: {instance.description}",
-                    )
-                    async def csv_ingest_entry(args: dict, tool_name=tool_name):
-                        return await dispatch_tool(tool_name, args or {})
+    for tool in all_rags_tools:
+        try:
+            tool_name = str(tool.get("name"))
+            tool_type = str(tool.get("type"))
+            logger.info("show me the fucking tool %s", tool_name)
+            if tool_type == Tools.CSV_RAG.value:
+                temp_instance = CsvRagTool(vs, name=tool_name)
+                await temp_instance.set_metadata_from_json()
+                description = temp_instance.description
+                logger.info(f"add description {description}")
 
-                    @reg.mcp.tool(
-                        name=tool_name,
-                        description=f"Query {tool_name}, description: {instance.description}",
-                    )
-                    async def csv_query_entry(args: dict, tool_name=tool_name):
-                        return await dispatch_tool(tool_name, args or {})
-                else:
-                    logger.warning(f"Unknown tool type '{tool_type}' for {tool_name}")
+                tool_factory = partial(CsvRagTool, vector_store=vs, name=tool_name)
+                wrapper = LazyToolWrapper(
+                    tool_factory,
+                    name=tool_name,
+                )
+                reg.register_instance(wrapper, name=tool_name)
 
-            except Exception as e:
-                logger.error(f"Failed to register tool {tool_name}: {e}")
+                @reg.mcp.tool(
+                    name=f"{tool_name}.ingest_folder",
+                    description=f"Ingest folder for {tool_name}, description: {description}",
+                )
+                async def csv_ingest_entry(args: dict, tool_name=tool_name):
+                    return await dispatch_tool(tool_name, args or {})
+
+                @reg.mcp.tool(
+                    name=tool_name,
+                    description=f"Query {tool_name}, description: {description}",
+                )
+                async def csv_query_entry(args: dict, tool_name=tool_name):
+                    return await dispatch_tool(tool_name, args or {})
+            else:
+                logger.warning(f"Unknown tool type '{tool_type}' for {tool_name}")
+
+        except Exception as e:
+            logger.error(f"Failed to register tool {tool_name}: {e}")
 
     @reg.mcp.tool(name=Tools.WEATHER.value, description="Weather lookup")
     async def weather_entry(args: dict):
