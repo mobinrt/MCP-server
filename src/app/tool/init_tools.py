@@ -39,7 +39,7 @@ async def init_tools(reg: Registry, vs: V):
 
     reg_mgr = ToolRegistryManager()
 
-    async with db.session_read() as session:
+    async with db.session() as session:
         all_rags_tools = await reg_mgr.list_of_enabled_tools(session)
 
     for tool in all_rags_tools:

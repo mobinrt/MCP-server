@@ -1,16 +1,6 @@
 import asyncio
 import hashlib
-from typing import (
-    Dict,
-    Any,
-    List,
-    Iterable,
-    AsyncIterable,
-    Union,
-    Tuple,
-    Sequence,
-    Optional,
-)
+from typing import Dict, Any, List, Iterable, AsyncIterable, Union, Tuple, Sequence, Optional
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -144,9 +134,7 @@ class VectorStoreAdapter:
     def __init__(self, vs_client):
         self.vs = vs_client
 
-    async def add_documents(
-        self, docs: List[Document], ids: Optional[List[str]] = None
-    ):
+    async def add_documents(self, docs: List[Document], ids: Optional[List[str]] = None):
         add_async = getattr(self.vs, "aadd_documents", None)
         if callable(add_async):
             try:
@@ -161,7 +149,6 @@ class VectorStoreAdapter:
         add_sync = getattr(self.vs, "add_documents", None)
         if callable(add_sync):
             loop = asyncio.get_running_loop()
-
             def _call():
                 try:
                     if ids is not None:
@@ -169,7 +156,6 @@ class VectorStoreAdapter:
                     return add_sync(docs)
                 except TypeError:
                     return add_sync(docs)
-
             await loop.run_in_executor(None, _call)
             return
 
@@ -217,9 +203,7 @@ class CSVIngestManager:
                 chk_to_dbid = await self.repo.bulk_upsert(session, buffer)
             except Exception:
                 logger.exception("bulk_upsert_rows failed for file_id=%s", file_id)
-                await self.repo.update_last_row_index(
-                    session, file_id, current_row_counter
-                )
+                await self.repo.update_last_row_index(session, file_id, current_row_counter)
                 continue
 
             # 2) Build Documents (one doc per original row) and run splitter to produce chunks
@@ -229,17 +213,12 @@ class CSVIngestManager:
                 dbid = chk_to_dbid.get(row["checksum"])
                 if not dbid:
                     continue
-                doc = Document(
-                    page_content=row["content"],
-                    metadata={"row_id": dbid, **row["fields"]},
-                )
+                doc = Document(page_content=row["content"], metadata={"row_id": dbid, **row["fields"]})
                 docs_for_split.append(doc)
                 row_checksum_map[dbid] = row["checksum"]
 
             if not docs_for_split:
-                await self.repo.update_last_row_index(
-                    session, file_id, current_row_counter
-                )
+                await self.repo.update_last_row_index(session, file_id, current_row_counter)
                 continue
 
             chunk_docs = self.splitter.split_documents(docs_for_split)
@@ -274,36 +253,24 @@ class CSVIngestManager:
                 row_chunk_counters[row_id] = idx + 1
 
             if not vs_docs:
-                await self.repo.update_last_row_index(
-                    session, file_id, current_row_counter
-                )
+                await self.repo.update_last_row_index(session, file_id, current_row_counter)
                 continue
 
             # 4) Persist to vector store (LangChain will embed internally)
             try:
                 await self.vs_adapter.add_documents(vs_docs, ids=vs_ids)
             except Exception as e:
-                failed_checksums = [
-                    self._chunk_checksum(d.page_content) for d in vs_docs
-                ]
+                failed_checksums = [self._chunk_checksum(d.page_content) for d in vs_docs]
                 await self.repo.mark_checksums_failed(session, failed_checksums, str(e))
-                logger.exception(
-                    "Vector store persistence failed for file_id=%s: %s", file_id, e
-                )
-                await self.repo.update_last_row_index(
-                    session, file_id, current_row_counter
-                )
+                logger.exception("Vector store persistence failed for file_id=%s: %s", file_id, e)
+                await self.repo.update_last_row_index(session, file_id, current_row_counter)
                 continue
 
             # 5) Mark rows done and set parent vector ids in DB (CSVRow.vector_id = 'CSVRow:<row_id>')
             try:
-                await self.repo.mark_rows_done_with_vector(
-                    session, row_ids_for_vs, vec_ids_for_db_update
-                )
+                await self.repo.mark_rows_done_with_vector(session, row_ids_for_vs, vec_ids_for_db_update)
             except Exception as e:
-                logger.exception(
-                    "Failed to mark rows done for file_id=%s: %s", file_id, e
-                )
+                logger.exception("Failed to mark rows done for file_id=%s: %s", file_id, e)
 
             await self.repo.update_last_row_index(session, file_id, current_row_counter)
 

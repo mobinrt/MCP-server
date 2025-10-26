@@ -64,7 +64,7 @@ class CsvRagTool(BaseTool):
         Still acquires an advisory lock to avoid duplicate ingestion races.
         """
 
-        async with self.db.session_write() as session:
+        async with self.db.session() as session:
             valid, tool_or_msg = await self.registry_mgr.validate_and_prepare_tool(
                 session, self.name
             )
@@ -120,7 +120,7 @@ class CsvRagTool(BaseTool):
             return
 
         lock_key = 42
-        async with self.db.session_write() as session:
+        async with self.db.session() as session:
             async with advisory_lock(session, lock_key) as acquired:
                 if not acquired:
                     logger.info(

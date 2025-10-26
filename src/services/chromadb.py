@@ -1,8 +1,6 @@
-# vector_store_langchain.py
 import os
 from typing import List, Dict, Any, Iterable, Optional, Sequence, Tuple
 
-# Prefer standalone integration when available
 try:
     from langchain_chroma import Chroma
 except Exception:
@@ -51,9 +49,6 @@ class ChromaVectorStore:
             embedding_function=self._emb,
         )
 
-    # ----------------------
-    # Ingestion
-    # ----------------------
     def add_texts(
         self,
         texts: Sequence[str],
@@ -92,9 +87,6 @@ class ChromaVectorStore:
         """Flush in-memory state to disk."""
         self.vs.persist()
 
-    # ----------------------
-    # Query
-    # ----------------------
     def similarity_search(
         self,
         query_text: str,
@@ -143,9 +135,6 @@ class ChromaVectorStore:
             embedding=list(query_vector), k=k, filter=filter
         )
 
-    # ----------------------
-    # Deletion
-    # ----------------------
     def delete(
         self,
         ids: Optional[Sequence[str]] = None,
@@ -156,9 +145,6 @@ class ChromaVectorStore:
         """
         self.vs.delete(ids=ids, where=where)
 
-    # ----------------------
-    # Retriever
-    # ----------------------
     def as_retriever(self, k: int = 5, filter: Optional[Dict[str, Any]] = None):
         """
         Returns a LangChain retriever for use with chains/agents.

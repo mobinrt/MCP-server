@@ -51,7 +51,7 @@ class CSVQueryManager:
         if hasattr(self.vs, "as_retriever") and callable(self.vs.as_retriever):
             try:
                 retriever = self.vs.as_retriever(k=top_k, filter=filter)
-                aget = getattr(retriever, "aget_relevant_documents", None)
+                aget = getattr(retriever, "ainvoke", None)
                 get_docs = getattr(retriever, "get_relevant_documents", None)
                 if callable(aget):
                     docs = await aget(query)
@@ -102,7 +102,7 @@ class CSVQueryManager:
                     seen.add(p)
                     unique_parent_ids.append(p)
 
-            async with self.db.session_read() as session:
+            async with self.db.session() as session:
                 rows = await select_rows_by_vector_ids(session, unique_parent_ids)
 
             id_to_row = {r.get("vector_id"): r for r in rows}

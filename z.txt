@@ -1,0 +1,1 @@
+fastmcp run main.py:async_init --transport http --port 8001

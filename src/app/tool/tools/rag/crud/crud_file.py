@@ -47,6 +47,7 @@ async def create_csv_file(
     )
     res = await session.execute(stmt)
     obj = res.scalar_one_or_none()
+    await session.commit()
     dict = model_to_dict(obj) if obj else None
     return dict
 
@@ -71,6 +72,7 @@ async def update_csv_file_checksum(
     sel = select(CSVFile).where(CSVFile.id == file_id)
     res = await session.execute(sel)
     obj = res.scalar_one_or_none()
+    await session.commit()
     return model_to_dict(obj) if obj else None
 
 
@@ -89,6 +91,7 @@ async def update_csv_file_status(
     )
     res = await session.execute(stmt)
     obj = res.scalar_one_or_none()
+    await session.commit()
     return model_to_dict(obj) if obj else None
 
 

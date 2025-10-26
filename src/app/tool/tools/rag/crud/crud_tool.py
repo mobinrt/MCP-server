@@ -31,7 +31,7 @@ async def create_tool_registry(
             enabled=enabled,
         )
         session.add(tool)
-        await session.refresh(tool)
+        await session.commit()
         return model_to_dict(tool) 
     except SQLAlchemyError:
         await session.rollback()
@@ -43,6 +43,8 @@ async def delete_tool_registry(session: AsyncSession, tool_name: str) -> bool:
     try:
         stmt = delete(ToolRegistry).where(ToolRegistry.name == tool_name)
         result = await session.execute(stmt)
+        await session.commit()
+        
         if result.rowcount:
             return True
         logger.warning(f"ToolRegistry entry not found: {tool_name}")
@@ -66,6 +68,8 @@ async def set_tool_enable_status(
         )
         result = await session.execute(stmt)
         row = result.scalar_one_or_none()
+        await session.commit()
+        
         if row:
             logger.info(f"Updated {tool_name} enabled={enabled}")
         else:
@@ -90,6 +94,8 @@ async def change_tool_adapter(
         )
         result = await session.execute(stmt)
         row = result.scalar_one_or_none()
+        await session.commit()
+        
         if row:
             logger.info(f"Changed adapter for {tool_name} → {adapter}")
         else:
@@ -106,14 +112,7 @@ async def get_tool_registry(
 ) -> Optional[ToolRegistry]:
     """Fetch a single ToolRegistry entry by name."""
     stmt = select(ToolRegistry).where(ToolRegistry.name == tool_name)
-    
-    try:
-        loop = asyncio.get_running_loop()
-        logger.debug("get_tool_registry running on loop id=%s session_id=%s stmt=%s", id(loop), id(session), stmt)
-    except RuntimeError:
-        logger.debug("get_tool_registry: no running loop; session_id=%s", id(session))
     result = await session.execute(stmt)
-    logger.debug("get_tool_registry: execute returned; session_id=%s", id(session))
 
     tool = result.scalar_one_or_none()
     return model_to_dict(tool) if tool else None

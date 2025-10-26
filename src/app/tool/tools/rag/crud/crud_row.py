@@ -42,6 +42,7 @@ async def bulk_upsert_rows(
         db_id = row.id
         checksum = row.checksum
         mapping[str(checksum)] = int(db_id)
+    await session.commit()
     return mapping
 
 
@@ -72,7 +73,8 @@ async def mark_rows_done_with_vector(
     )
 
     await session.execute(stmt)
-    
+    await session.commit()
+
 
 async def select_rows_by_ids(
     session: AsyncSession, ids: List[int]

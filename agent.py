@@ -1,5 +1,6 @@
 import asyncio
 import json
+import ast
 
 # from src.config.logger import logging
 
@@ -19,39 +20,31 @@ class AgentState(dict):
 
 
 ADMIN_NAME_PATTERNS = (".ingest_folder", ".ingest", ".admin")  # things not for LLM
-# Optional explicit allow list per tool prefix
 ALLOWED_PREFIXES = ("csv_rag", "weather", "health")
 
 
 def is_public_tool(tool_name: str) -> bool:
     ln = tool_name.lower()
-    # filter by explicit patterns first
     if any(pat in ln for pat in ADMIN_NAME_PATTERNS):
         return False
-    # optionally require allowed prefix
     if not any(ln.startswith(pref) for pref in ALLOWED_PREFIXES):
-        # you can be stricter here or allow more prefixes
         return False
     return True
 
-import ast
 
 def robust_parse(text: str) -> Optional[dict]:
     """Try strict JSON first, then fall back to Python literal eval."""
     if not text:
         return None
     text = text.strip()
-    # Step 1: JSON
     try:
         return json.loads(text)
     except Exception:
         pass
-    # Step 2: Python literal
     try:
         return ast.literal_eval(text)
     except Exception:
         pass
-    # Step 3: attempt original brace scan
     return extract_json_object_from_text(text)
 
 def simple_score(query: str, text: str) -> int:
@@ -64,13 +57,11 @@ def simple_score(query: str, text: str) -> int:
 async def fetch_public_tools() -> List[Dict]:
     async with MCPClient("http://127.0.0.1:8001/mcp") as client:
         tools = await client.list_tools()
-    # Convert to simple dicts: {'name': ..., 'description': ...}
     tool_list = []
     for t in tools:
         name = t.name if hasattr(t, "name") else getattr(t, "tool", None)
         desc = getattr(t, "description", "") or ""
         tool_list.append({"name": name, "description": desc})
-    # filter public tools
     return [t for t in tool_list if t["name"] and is_public_tool(t["name"])]
 
 
@@ -136,18 +127,15 @@ llm = OllamaLLM(model="qwen2.5:3b", base_url="http://localhost:11434")
 
 
 async def llm_node(state: AgentState):
-    # 1) fetch public tools
     tools = await fetch_public_tools()
 
-    # 2) build prompt and call LLM
     prompt = build_prompt(state["query"], tools)
     response = await llm.ainvoke(prompt)
     print("res: ", response)
 
-    # 3) parse JSON; robust fallback
     action = robust_parse(response)
     # if not action:
-    #     print("⚠️ LLM returned invalid JSON. Response:", response, "action: ", action)
+    #     print("LLM returned invalid JSON. Response:", response, "action: ", action)
     #     action = {"tool": "health.ping", "args": {}}
 
     # 4) validate selected tool exists and is public
@@ -155,9 +143,8 @@ async def llm_node(state: AgentState):
     tool_names = [t["name"] for t in tools]
     if selected not in tool_names:
         print(
-            f"⚠️ LLM chose invalid or disallowed tool '{selected}'. Attempting remap..."
+            f"LLM chose invalid or disallowed tool '{selected}'. Attempting remap..."
         )
-        # deterministic rerank: score query against name+description
         best = None
         best_score = -1
         for t in tools:
@@ -188,15 +175,14 @@ async def tool_node(state: AgentState):
     if not isinstance(args, dict):
         args = {}
 
-    # Validate again before calling MCP
+
     public_tools = await fetch_public_tools()
     public_names = {t["name"] for t in public_tools}
     if tool not in public_names:
-        # never call disallowed tools
+
         state["result"] = {"error": f"Tool '{tool}' is not allowed or not registered."}
         return state
 
-    # call the tool
     async with MCPClient("http://127.0.0.1:8001/mcp") as client:
         pass_args = {"args": args}
         result = await client.call_tool(tool, pass_args)
@@ -226,7 +212,6 @@ async def main():
     for q in ["give me a list of restaurant in Isfahan"]:
         print(f"\n=== Running query: {q} ===")
         result = await graph.ainvoke({"query": q})
-        # print entire state so you can see action/result for debugging
         print("Final state:", result)
         print("Final result:", result.get("result"))
 
