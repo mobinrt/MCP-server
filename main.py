@@ -7,14 +7,14 @@ from src.config import db
 from src.app.tool.registry import registry
 from src.config.settings import settings
 from src.app.tool.init_tools import init_tools
-from src.config.vector_store import VectorStore
+from src.services.chromadb import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
 
 
-async def async_init():
+async def async_init() -> FastMCP:
     """Initialize tools before starting server."""
-    vs = VectorStore()
+    vs = ChromaVectorStore()
     print("Initializing tools...")
     await db.init_db()
     await init_tools(registry, vs)

@@ -2,7 +2,7 @@ import asyncio
 
 from src.config import db
 from src.app.tool.tools.rag.rag import CsvRagTool
-from src.config.vector_store import VectorStore
+from src.services.chromadb import ChromaVectorStore
 from src.config.logger import logging
 
 logger = logging.getLogger(__name__)
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 async def main():
     # --- 1. Setup DB + Vector store
-    vs = VectorStore().get()
+    vs = ChromaVectorStore()
     # --- 2. Init CsvRagTool
     tool = CsvRagTool(vs, name="csv_rag:civil_places") # add name of subtool u wanna test for new design
     await tool.initialize()

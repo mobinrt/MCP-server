@@ -1,5 +1,5 @@
 from functools import partial
-
+from typing import TypeVar
 from src.base.vector_store import VectorStoreBase
 from src.config import db
 from src.app.tool.tools.rag.rag import CsvRagTool
@@ -28,8 +28,10 @@ def _weather_factory() -> WeatherTool:
 #     Tools.WEATHER.value: _weather_factory,
 # }
 
+V = TypeVar("V", bound=VectorStoreBase)
 
-async def init_tools(reg: Registry, vs: VectorStoreBase):
+
+async def init_tools(reg: Registry, vs: V):
     weather_wrapper = LazyToolWrapper(
         lambda: WeatherTool(cities_path=cities_path), name=Tools.WEATHER.value
     )

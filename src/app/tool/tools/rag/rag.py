@@ -1,7 +1,7 @@
 from pathlib import Path
 import aiofiles
 import json
-
+from typing import TypeVar
 from src.config.logger import logging
 from src.base.base_tool import BaseTool
 from src.helpers.pg_lock import advisory_lock
@@ -18,6 +18,7 @@ from .schemas import RagArgs
 
 logger = logging.getLogger(__name__)
 
+V=TypeVar("V", bound=VectorStoreBase)
 
 class CsvRagTool(BaseTool):
     """
@@ -27,7 +28,7 @@ class CsvRagTool(BaseTool):
 
     def __init__(
         self,
-        vector_store: VectorStoreBase,
+        vector_store: V,
         name: str,
     ):
         self.db: Database = global_db

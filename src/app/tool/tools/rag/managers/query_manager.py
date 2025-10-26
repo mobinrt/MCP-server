@@ -1,93 +1,102 @@
-"""
-CSVQueryManager (query → embed → vs → db)
-"""
-
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TypeVar
 import asyncio
 from langchain.schema import Document
-
 from src.config.logger import logging
 from src.base.vector_store import VectorStoreBase
 from src.app.tool.tools.rag.crud.crud_row import select_rows_by_vector_ids
-from src.services.embedding import embed_texts_async
 from src.config import Database, db as global_db
 
+from src.services.embedding import get_embeddings
+
 logger = logging.getLogger(__name__)
+
+V = TypeVar("V", bound=VectorStoreBase)
 
 
 class CSVQueryManager:
     """
-    Use vectorstore retriever when available. Keeps DB fetch path as fallback if needed.
+    CSVQueryManager (query → embed → vs → db)
+    Uses vectorstore retriever when available, falls back to vector-by-vector search + DB join.
     """
 
-    def __init__(self, vector_store: VectorStoreBase):
+    def __init__(self, vector_store: V):
         self.db: Database = global_db
         self.vs = vector_store
-        try:
-            self.retriever = getattr(self.vs, "as_retriever")(search_kwargs={"k": 5})
-        except Exception:
-            self.retriever = None
+        self.retriever = self._init_retriever()
+
+    def _init_retriever(self) -> Optional[object]:
+        """Try to initialize a default retriever."""
+        if hasattr(self.vs, "as_retriever") and callable(self.vs.as_retriever):
+            try:
+                retriever = self.vs.as_retriever(k=5)
+                logger.debug(f"Retriever initialized: {type(retriever).__name__}")
+                return retriever
+            except Exception as e:
+                logger.warning("Retriever init failed: %s", e)
+        else:
+            logger.info("Vector store has no retriever interface.")
+        return None
+
+    async def _embed_query(self, query: str) -> List[float]:
+        """Non-blocking wrapper around HuggingFace embed_query."""
+        emb = await asyncio.to_thread(get_embeddings().embed_query, query)
+        return emb
 
     async def search(
         self, query: str, top_k: int = 5, filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Returns list of rows like:
-        [
-          {"id": row_id, "external_id": ..., "content": "...", "fields": {...}, "score": ...},
-          ...
-        ]
-        """
+        """Query vector store (retriever if available), fallback to vector search + DB join."""
+        docs: List[Document] = []
 
-        # 1) Preferred: async retriever that returns Documents
-        if self.retriever is not None:
-            aget = getattr(self.retriever, "aget_relevant_documents", None)
-            if callable(aget):
-                try:
-                    docs: List[Document] = await aget(query)
-                except Exception as e:
-                    logger.exception("Async retriever failed: %s", e)
-                    docs = []
-            else:
-                get_docs = getattr(self.retriever, "get_relevant_documents", None)
-                if callable(get_docs):
+        if hasattr(self.vs, "as_retriever") and callable(self.vs.as_retriever):
+            try:
+                retriever = self.vs.as_retriever(k=top_k, filter=filter)
+                aget = getattr(retriever, "aget_relevant_documents", None)
+                get_docs = getattr(retriever, "get_relevant_documents", None)
+                if callable(aget):
+                    docs = await aget(query)
+                elif callable(get_docs):
                     loop = asyncio.get_running_loop()
                     docs = await loop.run_in_executor(None, lambda: get_docs(query))
-                else:
-                    docs = []
+            except Exception as e:
+                logger.exception("Retriever failed: %s", e)
 
-            out = []
-            for d in docs[:top_k]:
-                meta = d.metadata or {}
-                out.append(
-                    {
-                        "id": meta.get("row_id"),
-                        "external_id": meta.get("external_id"),
-                        "content": d.page_content,
-                        "fields": meta,
-                        "score": meta.get("score"),
-                    }
-                )
-            return out
+            if docs:
+                out = []
+                for d in docs[:top_k]:
+                    meta = d.metadata or {}
+                    out.append(
+                        {
+                            "id": meta.get("row_id"),
+                            "external_id": meta.get("external_id"),
+                            "content": d.page_content,
+                            "fields": meta,
+                            "score": meta.get("score"),
+                        }
+                    )
+                return out
 
-        # 2) Fallback: compute embedding + call legacy vs.query (sync)
         try:
-            embs = await embed_texts_async([query])
-            emb = embs[0]
-            res = self.vs.query(emb, top_k=top_k, filter=filter)
-            vector_ids = res.get("ids", [[]])[0] if "ids" in res else res.get("ids", [])
-            scores = (
-                res.get("distances", [[]])[0]
-                if "distances" in res
-                else [None] * len(vector_ids)
+            emb = await self._embed_query(query)
+
+            results = self.vs.similarity_search_by_vector_with_score(
+                query_vector=emb, k=top_k, filter=filter
             )
 
-            parent_ids = [
-                vid.rsplit(":", 1)[0] if (isinstance(vid, str) and ":" in vid) else vid
-                for vid in vector_ids
-            ]
-            seen = set()
+            vector_ids = []
+            scores = []
+            for doc, score in results:
+                m = doc.metadata or {}
+                row_id = m.get("row_id")
+                if row_id is not None:
+                    vector_ids.append(f"CSVRow:{int(row_id)}:0")
+                    scores.append(float(score))
+
+            parent_ids = [vid.split(":", 2)[:2] for vid in vector_ids]
+            parent_ids = [":".join(parts) for parts in parent_ids]
+
             unique_parent_ids = []
+            seen = set()
             for p in parent_ids:
                 if p not in seen:
                     seen.add(p)
@@ -98,11 +107,10 @@ class CSVQueryManager:
 
             id_to_row = {r.get("vector_id"): r for r in rows}
             out = []
-            for i, vid in enumerate(vector_ids):
-                parent = parent_ids[i]
-                r = id_to_row.get(parent)
+            for i, parent_vec_id in enumerate(parent_ids):
+                r = id_to_row.get(parent_vec_id)
                 if not r:
-                    logger.warning(f"No DB row found for parent vector_id={parent}")
+                    logger.warning("No DB row found for vector_id=%s", parent_vec_id)
                     continue
                 out.append(
                     {
