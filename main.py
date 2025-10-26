@@ -1,7 +1,7 @@
 import warnings
-import anyio
+import asyncio
 import uvicorn
-
+from fastmcp import FastMCP
 from src.config.logger import logging
 from src.config import db
 from src.app.tool.registry import registry
@@ -11,34 +11,53 @@ from src.config.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
-# warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-app = registry.http_app()
-
 
 async def async_init():
     """Initialize tools before starting server."""
     vs = VectorStore()
-    logger.info("Initializing tools...")
+    print("Initializing tools...")
     await db.init_db()
     await init_tools(registry, vs)
-    logger.info("Tools initialized successfully.")
+    print("Tools initialized successfully.")
+    
+    return registry.mcp
 
 
-if __name__ == "__main__":
-    anyio.run(async_init)
+    
+# if __name__ == "__main__":
+#     import asyncio
 
-    port = int(settings.port)
-    host = settings.host
+#     asyncio.run(async_init())
+#     registry.run(host="0.0.0.0", port=8001, transport="http")
 
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=8001,
-        log_level="info",
-        access_log=True,
-        use_colors=True,
-    )
-    """
-    for using Uvicorn, u should use FastAPI and lifespan
-    """
+# app = registry.http_app()
+
+# @app.on_event("startup")
+# async def startup_event():
+#     """Initialize tools and DB inside Uvicorn’s event loop."""
+#     vs = VectorStore()
+#     logger.info("Initializing tools...")
+
+#     await db.init_db()
+
+#     await init_tools(registry, vs)
+
+#     loop = asyncio.get_running_loop()
+#     logger.info("Server main loop_id=%s starting up", id(loop))
+#     logger.info("Tools initialized successfully.")
+
+
+# if __name__ == "__main__":
+#     # warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+#     port = int(settings.port)
+#     host = settings.host
+
+#     uvicorn.run(
+#         "main:app",
+#         host=host,
+#         port=8001,
+#         log_level="info",
+#         access_log=True,
+#         use_colors=True,
+#     )

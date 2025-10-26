@@ -35,8 +35,7 @@ async def bulk_upsert_rows(
     )
 
     res = await session.execute(stmt)
-    await session.commit()
-
+    
     mapping: Dict[str, int] = {}
 
     for row in res.fetchall():
@@ -73,8 +72,7 @@ async def mark_rows_done_with_vector(
     )
 
     await session.execute(stmt)
-    await session.commit()
-
+    
 
 async def select_rows_by_ids(
     session: AsyncSession, ids: List[int]

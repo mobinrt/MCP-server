@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, Any, Dict, List
 import logging
 
@@ -77,6 +78,9 @@ class ToolRegistryManager:
         - This function intentionally does not mutate CSV files; it only ensures a registry
           row exists so higher-level code can decide what to do.
         """
+        logger.debug("validate_and_prepare_tool: loop=%s tool=%s session_id=%s", 
+             id(asyncio.get_running_loop()), tool_name, id(session))
+
         tool = await get_tool_registry(session, tool_name)
         if tool:
             return True, tool

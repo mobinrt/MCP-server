@@ -63,7 +63,7 @@ class CsvRagTool(BaseTool):
         Still acquires an advisory lock to avoid duplicate ingestion races.
         """
 
-        async with self.db.session() as session:
+        async with self.db.session_write() as session:
             valid, tool_or_msg = await self.registry_mgr.validate_and_prepare_tool(
                 session, self.name
             )
@@ -79,34 +79,34 @@ class CsvRagTool(BaseTool):
                 )
                 valid = True
 
-        tool = tool_or_msg
-        # async with self.db.session() as session:
-        #     tool = self.registry_mgr.get_tool(session, self.name)
-        #     if not tool:
-        #         tool = await self.registry_mgr.create_tool(
-        #             session,
-        #             name=self.name,
-        #             description="Global CSV RAG root tool",
-        #             file_id=None,
-        #         )
+            tool = tool_or_msg
+            # async with self.db.session() as session:
+            #     tool = await self.registry_mgr.get_tool(session, self.name)
+            #     if not tool:
+            #         tool = await self.registry_mgr.create_tool(
+            #             session,
+            #             name=self.name,
+            #             description="Global CSV RAG root tool",
+            #             file_id=None,
+            #         )
 
-        # lock_key = 1000
-        # async with self.db.session() as session:
-        #     async with advisory_lock(
-        #         session, lock_key, wait=False, retries=5, delay=0.1
-        #     ) as acquired:
-        #         if not acquired:
-        #             logger.info(
-        #                 f"CsvRagTool initialize: another process holds the lock (tool={tool.name}). Proceeding (ready)."
-        #             )
-                # else:
-        await self.registry_mgr.initialize_tool(
-            session, tool.name, tool.file_id
-        )
-        logger.info(
-            f"CsvRagTool initialize: acquired lock and validated tool '{tool.name}'."
-        )
-        self._ready = True
+            lock_key = 1000
+            
+            async with advisory_lock(
+                session, lock_key, wait=False, retries=5, delay=0.1
+            ) as acquired:
+                if not acquired:
+                    logger.info(
+                        f"CsvRagTool initialize: another process holds the lock (tool={tool.get("name")}). Proceeding (ready)."
+                    )
+                else:
+                    await self.registry_mgr.initialize_tool(
+                        session, tool.get("name"), tool.get("file_id")
+                    )
+                    logger.info(
+                        f"CsvRagTool initialize: acquired lock and validated tool '{tool.get("name")}'."
+                    )
+                    self._ready = True
 
     async def ingest_folder(self, folder_path: str, batch_size: int = 512):
         """
@@ -118,20 +118,19 @@ class CsvRagTool(BaseTool):
             logger.warning("CsvRagTool not initialized. Call initialize() first.")
             return
 
-        # lock_key = 42
-        # async with self.db.session() as session:
-        #     async with advisory_lock(session, lock_key) as acquired:
-        #         if not acquired:
-        #             logger.info(
-        #                 "ingest_folder: another process holds lock, skipping ingestion."
-        #             )
-        #             return
+        lock_key = 42
+        async with self.db.session_write() as session:
+            async with advisory_lock(session, lock_key) as acquired:
+                if not acquired:
+                    logger.info(
+                        "ingest_folder: another process holds lock, skipping ingestion."
+                    )
+                    return
 
-        file_paths = await self.file_mgr.scan_folder(folder_path)
-        for p in file_paths:
-            async with self.db.session() as session_db:
+            file_paths = await self.file_mgr.scan_folder(folder_path)
+            for p in file_paths:
                 file_meta = await self.file_mgr.get_or_register_file(
-                    session_db, p
+                    session, p
                 )
 
                 status = file_meta.get("status")
@@ -149,17 +148,17 @@ class CsvRagTool(BaseTool):
                     logger.info(f"Processing pending or failed file {p}")
                     try:
                         await self.ingest_mgr.ingest_rows(
-                            session_db,
+                            session,
                             CSVLoader.stream_csv_async(p),
                             batch_size=batch_size,
                             file_meta=file_meta,
                         )
                         await self.file_mgr.mark_file_as_done(
-                            session_db, file_meta
+                            session, file_meta
                         )
 
                         await self.registry_mgr.create_tool(
-                            session_db,
+                            session,
                             name=f"{self.name}:{Path(file_meta.get('path')).stem}",
                             file_id=file_meta.get("id"),
                         )
@@ -168,10 +167,10 @@ class CsvRagTool(BaseTool):
 
                     except Exception as e:
                         await self.file_mgr.mark_file_as_failed(
-                            session_db, file_meta
+                            session, file_meta
                         )
                         logger.error("Ingestion failed for file %s: %s", p, e)
-                        await session_db.rollback()
+                        await session.rollback()
                 else:
                     logger.info("Skipping unchanged file: %s", p)
 

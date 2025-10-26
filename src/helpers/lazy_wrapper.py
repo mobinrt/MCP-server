@@ -18,7 +18,7 @@ class LazyToolWrapper(AdapterBase):
     ):
         self.factory = factory
         self._instance: BaseTool | None = None
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
         self._name = name or getattr(factory, "__name__", "lazy_tool")
         self._description = description
         self._ready = False
@@ -27,29 +27,32 @@ class LazyToolWrapper(AdapterBase):
         if self._ready:
             return
 
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+
         async with self._lock:
             if self._ready:
                 return
 
+            loop = asyncio.get_running_loop()
+            logger.debug(
+                "LazyToolWrapper._ensure_instance loop id=%s for %s",
+                id(loop),
+                self._name,
+            )
+
             logger.info("LazyToolWrapper: creating instance for %s", self._name)
             inst = self.factory()
-
-            try:
-                self._description = getattr(inst, "description", "") or ""
-            except Exception:
-                self._description = ""
+            self._instance = inst
 
             init = getattr(inst, "initialize", None)
             if callable(init):
-                ret = init()
-                if inspect.isawaitable(ret):
-                    try:
-                        await ret
-                    except Exception as e:
-                        logger.exception(f"Initialization failed for {self._name}: {e}")
-                        raise
+                result = init()
+                if inspect.isawaitable(result):
+                    task = loop.create_task(result)
+                    await task
 
-            self._instance = inst
+            self._description = getattr(inst, "description", "") or ""
             self._ready = True
             logger.info("LazyToolWrapper: instance ready for %s", self._name)
 

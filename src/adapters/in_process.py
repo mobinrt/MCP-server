@@ -14,6 +14,7 @@ InProcessAdapter: runs tools in-process by calling their initialize() and run()
 
 class InProcessAdapter(AdapterBase):
     def __init__(self, impl: Any):
+        
         self._impl = impl
         self._ready = False
 
@@ -31,7 +32,7 @@ class InProcessAdapter(AdapterBase):
             if inspect.iscoroutinefunction(init):
                 await init()
             else:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, init)
 
         self._ready = bool(getattr(self._impl, "ready", True))
@@ -47,5 +48,5 @@ class InProcessAdapter(AdapterBase):
         if inspect.iscoroutinefunction(fn):
             return await fn(args)
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             return await loop.run_in_executor(None, fn, args)

@@ -34,6 +34,25 @@ def is_public_tool(tool_name: str) -> bool:
         return False
     return True
 
+import ast
+
+def robust_parse(text: str) -> Optional[dict]:
+    """Try strict JSON first, then fall back to Python literal eval."""
+    if not text:
+        return None
+    text = text.strip()
+    # Step 1: JSON
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    # Step 2: Python literal
+    try:
+        return ast.literal_eval(text)
+    except Exception:
+        pass
+    # Step 3: attempt original brace scan
+    return extract_json_object_from_text(text)
 
 def simple_score(query: str, text: str) -> int:
     """Simple deterministic scoring for remapping. Count keyword overlap."""
@@ -66,7 +85,7 @@ Available tools:
 {tool_lines}
 
 tools schema:
-- csv_rag:all_subtools(query: str, top_k: int)
+- csv_rag:all_subtools(query: str, top_k: int) *notice: u should change the all_subtools with proper tool from mcp registerd tools
 - weather(city: str)
 - health.ping()
 
@@ -126,10 +145,10 @@ async def llm_node(state: AgentState):
     print("res: ", response)
 
     # 3) parse JSON; robust fallback
-    action = extract_json_object_from_text(response)
-    if not action:
-        print("⚠️ LLM returned invalid JSON. Response:", response, "action: ", action)
-        action = {"tool": "health.ping", "args": {}}
+    action = robust_parse(response)
+    # if not action:
+    #     print("⚠️ LLM returned invalid JSON. Response:", response, "action: ", action)
+    #     action = {"tool": "health.ping", "args": {}}
 
     # 4) validate selected tool exists and is public
     selected = action.get("tool")

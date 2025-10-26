@@ -12,7 +12,7 @@ async def main():
     # --- 1. Setup DB + Vector store
     vs = VectorStore().get()
     # --- 2. Init CsvRagTool
-    tool = CsvRagTool(vs, name=...) # add name of subtool u wanna test for new design
+    tool = CsvRagTool(vs, name="csv_rag:civil_places") # add name of subtool u wanna test for new design
     await tool.initialize()
 
     # --- 3. Ingest folder

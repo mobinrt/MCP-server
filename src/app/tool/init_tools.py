@@ -1,10 +1,9 @@
 from functools import partial
 
-from src.base import vector_store
+from src.base.vector_store import VectorStoreBase
 from src.config import db
 from src.app.tool.tools.rag.rag import CsvRagTool
 from src.app.tool.tools.weather.weather import WeatherTool
-from src.config.vector_store import VectorStore
 from src.enum.tools import Tools
 from src.app.tool.registry import Registry
 from src.app.tool.tools.weather import cities_path
@@ -30,7 +29,7 @@ def _weather_factory() -> WeatherTool:
 # }
 
 
-async def init_tools(reg: Registry, vs: VectorStore):
+async def init_tools(reg: Registry, vs: VectorStoreBase):
     weather_wrapper = LazyToolWrapper(
         lambda: WeatherTool(cities_path=cities_path), name=Tools.WEATHER.value
     )
@@ -38,7 +37,7 @@ async def init_tools(reg: Registry, vs: VectorStore):
 
     reg_mgr = ToolRegistryManager()
 
-    async with db.session() as session:
+    async with db.session_read() as session:
         all_rags_tools = await reg_mgr.list_of_enabled_tools(session)
 
     for tool in all_rags_tools:
